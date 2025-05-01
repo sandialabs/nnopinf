@@ -95,12 +95,13 @@ def optimize_weights(model,input_dict_data,response_data,training_settings):
   #Loss function
   n_epochs = training_settings['num-epochs']
   def my_criterion(y,yhat,epoch):
-    rom_dim = y.shape[-1]
-    scaling = 1./torch.mean(torch.abs(y),0)
-    epochs_per_dim = n_epochs / rom_dim
-    rom_dim_to_train = rom_dim#int( np.ceil(epoch/epochs_per_dim) )
+    #rom_dim = y.shape[-1]
+    #scaling = 1./torch.mean(torch.abs(y),0)
+    #epochs_per_dim = n_epochs / rom_dim
+    #rom_dim_to_train = rom_dim#int( np.ceil(epoch/epochs_per_dim) )
     #print(rom_dim_to_train)
-    loss_mse = torch.mean( (( y[:,0:rom_dim_to_train] - yhat[:,0:rom_dim_to_train])**2 ) )  / torch.mean(y[:,0:rom_dim_to_train]**2 + 1e-6)
+    #loss_mse = torch.mean( (( y[:,0:rom_dim_to_train] - yhat[:,0:rom_dim_to_train])**2 ) )  / torch.mean(y[:,0:rom_dim_to_train]**2 + 1e-6)
+    loss_mse = torch.mean( (( y - yhat)**2 ) )  / torch.mean(y**2 + 1e-3)
     return loss_mse
 
   #Optimizer
@@ -116,7 +117,12 @@ def optimize_weights(model,input_dict_data,response_data,training_settings):
 
 
   #while (epoch < training_settings['num-epochs'] + 1):
-  for epoch in tqdm.tqdm(np.arange(1,training_settings['num-epochs'] + 1)):
+  print('==========================')
+  print('Training loop')
+
+  pbar = tqdm.tqdm(np.arange(1,training_settings['num-epochs'] + 1), position=0, leave=True)
+  for epoch in pbar:
+  #for epoch in tqdm.tqdm(np.arange(1,training_settings['num-epochs'] + 1)):
   
       # monitor training loss
       train_loss = 0.0
@@ -169,10 +175,15 @@ def optimize_weights(model,input_dict_data,response_data,training_settings):
       lr_scheduler.step()
       lr = lr_scheduler.get_last_lr()[0]      
   
-      if training_settings['print-training-output']:
-        print('Epoch: {} \tLearning rate: {:.6f} \tTraining Loss: {:.6f} \tTesting Loss: {:.6f}'.format(epoch, lr, train_loss,val_loss,lr))
-        #print("{:3d}       {:0.6f}        {:0.6f}     {:0.3e}".format(epoch, train_loss, val_loss, lr))
-        print('Time: {:.6f}'.format(time.time() - t0))
+      # Custom message or additional information
+      #pbar.set_description('Epoch: {} \tLearning rate: {:.6f} \tTraining Loss: {:.6f} \tTesting Loss: {:.6f}'.format(epoch, lr, train_loss,val_loss,lr))
+      pbar.set_description(f"Epoch: {epoch}, Learning rate: {lr:.4f}, Training loss: {train_loss:.4f}, Validation loss: {val_loss:.4f}")
+
+
+      #if training_settings['print-training-output']:
+      #  print('Epoch: {} \tLearning rate: {:.6f} \tTraining Loss: {:.6f} \tTesting Loss: {:.6f}'.format(epoch, lr, train_loss,val_loss,lr))
+      #  #print("{:3d}       {:0.6f}        {:0.6f}     {:0.3e}".format(epoch, train_loss, val_loss, lr))
+      #  print('Time: {:.6f}'.format(time.time() - t0))
   
       #if (epoch > 1000):
       #  val_loss_running_mean = np.mean(val_loss_hist[-400::])
