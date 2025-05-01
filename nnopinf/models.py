@@ -56,6 +56,10 @@ class OpInfModel(nn.Module):
             self.wrapped_operators_[i].operator_.hierarchical_update(input_model.wrapped_operators_[i].operator_)
 
 
+    def remove_spectral_norm(self):
+        for i in range(0,len(self.wrapped_operators_)):
+            self.wrapped_operators_[i].operator_.remove_spectral_norm()
+
 class WrappedOperatorForModel:
     def __init__(self,operator,inputs,name):
         self.operator_ = operator

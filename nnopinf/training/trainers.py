@@ -2,9 +2,11 @@ import numpy as np
 import pickle
 import torch
 import time
+import tqdm
 torch.set_default_dtype(torch.float64)
 import os
 import nnopinf
+
 
 class DataClass:
   '''
@@ -27,6 +29,8 @@ def split_and_normalize(x,normalization_type,training_samples,validation_samples
     else:
       if normalization_type == 'Standard':
         normalizer = nnopinf.training.StandardNormalizer(x)
+      elif normalization_type == 'Abs':
+        normalizer = nnopinf.training.AbsNormalizer(x)
       elif normalization_type == 'MaxAbs':
         normalizer = nnopinf.training.MaxAbsNormalizer(x)
       elif normalization_type == 'None':
@@ -41,7 +45,7 @@ def split_and_normalize(x,normalization_type,training_samples,validation_samples
     return x_data
 
 
-def prepare_data(inputs, response, validation_percent):
+def prepare_data(inputs, response, validation_percent, training_settings):
     '''
     Take input data, split into test and training, and normalize
     '''
@@ -57,7 +61,12 @@ def prepare_data(inputs, response, validation_percent):
 
     inputs_data = {}
     for key in list(inputs.keys()):
-        inputs_data[key] = split_and_normalize(inputs[key],'MaxAbs',train_samples,val_samples)
+        if key + '-normalization-strategy' in training_settings:
+          norm_strategy = training_settings[key + '-normalization-strategy']
+          inputs_data[key] = split_and_normalize(inputs[key],norm_strategy,train_samples,val_samples)
+        else:
+          print('No noralization strategy specified, using max abs')
+          inputs_data[key] = split_and_normalize(inputs[key],'MaxAbs',train_samples,val_samples)
     response_data = split_and_normalize(response,'MaxAbs',train_samples,val_samples)
     return inputs_data,response_data
     
@@ -84,8 +93,14 @@ def optimize_weights(model,input_dict_data,response_data,training_settings):
   val_data_loader = torch.utils.data.DataLoader(val_data_torch, batch_size=batch_size)
   
   #Loss function
-  def my_criterion(y,yhat):
-    loss_mse = torch.mean( (y - yhat)**2 )  / torch.mean(y[:,0]**2 + 1e-5)
+  n_epochs = training_settings['num-epochs']
+  def my_criterion(y,yhat,epoch):
+    rom_dim = y.shape[-1]
+    scaling = 1./torch.mean(torch.abs(y),0)
+    epochs_per_dim = n_epochs / rom_dim
+    rom_dim_to_train = rom_dim#int( np.ceil(epoch/epochs_per_dim) )
+    #print(rom_dim_to_train)
+    loss_mse = torch.mean( (( y[:,0:rom_dim_to_train] - yhat[:,0:rom_dim_to_train])**2 ) )  / torch.mean(y[:,0:rom_dim_to_train]**2 + 1e-6)
     return loss_mse
 
   #Optimizer
@@ -100,7 +115,8 @@ def optimize_weights(model,input_dict_data,response_data,training_settings):
   epoch = 1
 
 
-  while (epoch < training_settings['num-epochs'] + 1):
+  #while (epoch < training_settings['num-epochs'] + 1):
+  for epoch in tqdm.tqdm(np.arange(1,training_settings['num-epochs'] + 1)):
   
       # monitor training loss
       train_loss = 0.0
@@ -117,7 +133,7 @@ def optimize_weights(model,input_dict_data,response_data,training_settings):
           response_t = data_d[:,start_index::]
           optimizer.zero_grad()
           yhat = model(model_inputs)
-          loss = my_criterion(response_t,yhat)
+          loss = my_criterion(response_t,yhat,epoch)
           loss.backward()
           optimizer.step()
           train_loss += loss.item()*response_t.size(0)
@@ -142,7 +158,7 @@ def optimize_weights(model,input_dict_data,response_data,training_settings):
               start_index = end_index*1
           response_t = data_d[:,start_index::]
           yhat = model.forward(model_inputs)
-          loss = my_criterion(response_t,yhat)
+          loss = my_criterion(response_t,yhat,epoch)
           val_loss += loss.item()*response_t.size(0)
           n_samples += response_t.size(0)
  
@@ -166,12 +182,18 @@ def optimize_weights(model,input_dict_data,response_data,training_settings):
       #    epoch = 1e10
       epoch += 1
 
+  wall_time = time.time() - t0
+  print('==========================')
+  print('Final Training Loss: {:.6f} \tFinal testing Loss: {:.6f}'.format(train_loss,val_loss,lr))
+  print('Time: {:.6f}'.format(wall_time))
+  print('==========================')
+
   #np.savez(modelDir + '/' + modelName + '_stats'  , train_loss=train_loss_hist,val_loss=val_loss_hist,walltime = time.time() - t0)
   #model.set_scalings(x_normalizer=states.normalizer,y_normalizer=response.normalizer,mu_normalizer=parameters.normalizer,u_normalizer=inputs.normalizer)
   ## Save scalings
   input_scalings = {}
   for key in list(input_dict_data.keys()):
-      input_scalings[key] = torch.tensor(input_dict_data[key].normalizer.scaling_value[:])
+      input_scalings[key] = torch.tensor(input_dict_data[key].normalizer.scaling_value)
 
   torch.save(model, training_settings['output-path'] + '/' + training_settings['model-name'] + '_not_scaled.pt')
 
@@ -179,7 +201,7 @@ def optimize_weights(model,input_dict_data,response_data,training_settings):
   model.set_scalings(input_scalings,output_scalings)
   torch.save(model, training_settings['output-path'] + '/' + training_settings['model-name'] + '.pt')
   model.save_operators(training_settings['output-path'] )
-  np.savez(training_settings['output-path'] + '/' + training_settings['model-name'] + '_training_stats.npz',training_loss=train_loss_hist,validation_loss=val_loss_hist)
+  np.savez(training_settings['output-path'] + '/' + training_settings['model-name'] + '_training_stats.npz',training_loss=train_loss_hist,validation_loss=val_loss_hist,wall_time=wall_time)
   #with open(modelDir + '/' + modelName + '_feature_normalizer.pickle', 'wb') as file:
   #  pickle.dump(trainingData.feature_normalizer, file) 
   #with open(modelDir + '/' + modelName + '_response_normalizer.pickle', 'wb') as file:
@@ -193,7 +215,7 @@ def train(model,input_dict,y,training_settings):
     else:
         os.makedirs(training_settings['output-path'])
     validation_percent = 0.2
-    input_dict_data,y_data = prepare_data(input_dict,y,validation_percent) 
+    input_dict_data,y_data = prepare_data(input_dict,y,validation_percent,training_settings) 
     optimize_weights(model,input_dict_data,y_data,training_settings)
 
 

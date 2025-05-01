@@ -34,6 +34,12 @@ class CompositeOperator(nn.Module):
             operator = self.state_operators[i]
             operator.hierarchical_update(input_operator.state_operators[i])
 
+    def remove_spectral_norm(self):
+        for i in range(len(self.state_operators)):
+            operator = self.state_operators[i]
+            operator.remove_spectral_norm()
+
+
 
 class NpdOperator(nn.Module):
     def __init__(self,n_hidden_layers,n_neurons_per_layer,n_inputs,n_outputs):
@@ -54,6 +60,9 @@ class NpdOperator(nn.Module):
 
     def hierarchical_update(self,input_operator):
         self.SpdOperator.hierarchical_update(input_operator)
+
+    def remove_spectral_norm(self):
+        self.SpdOperator.remove_spectral_norm()
 
 class SpdOperator(nn.Module):
     def __init__(self,n_hidden_layers,n_neurons_per_layer,n_inputs,n_outputs):
@@ -77,7 +86,9 @@ class SpdOperator(nn.Module):
         output_dim = dim[1::]
 
         for i in range(0,n_hidden_layers+1):
-          forward_list.append(nn.Linear(input_dim[i], output_dim[i]))
+          #forward_list.append(torch.nn.utils.spectral_norm(  nn.Linear(input_dim[i], output_dim[i]) ))
+          forward_list.append( nn.Linear(input_dim[i], output_dim[i]) )
+
         self.forward_list = nn.ModuleList(forward_list)
         self.activation = F.relu
         self.input_scaling_ = torch.ones(n_inputs)
@@ -93,11 +104,16 @@ class SpdOperator(nn.Module):
       y = self.forward_list[-1](y)
 
       K = torch.zeros(y.shape[0],self.n_outputs,self.n_outputs)
-
+      
       K[:,self.idx[0],self.idx[1]] = y[:,0:self.idx[0].size]
 
       KT = torch.transpose(K,2,1)
+
       K = torch.einsum('ijk,ikl->ijl',K,KT)
+
+
+      #K = L D L^T 
+      
       K = torch.einsum('ij,njk->nik',self.output_scaling_mat_,K) 
       K = torch.einsum('nij,jk->nik',K,self.input_scaling_mat_) 
 
@@ -106,6 +122,13 @@ class SpdOperator(nn.Module):
           return result, K
       else:
           return result
+
+    def remove_spectral_norm(self):
+      for i in range(0,self.num_layers):
+        #torch.nn.utils.parametrize.remove_parametrizations(self.forward_list[i])
+        torch.nn.utils.remove_spectral_norm(self.forward_list[i],"weight")
+
+
 
     def set_scalings(self,input_scaling,output_scaling):
       n_outputs = self.output_scaling_.size()[0]
@@ -239,7 +262,8 @@ class SkewOperator(nn.Module):
         output_dim = dim[1::]
 
         for i in range(0,n_hidden_layers+1):
-          forward_list.append(nn.Linear(input_dim[i], output_dim[i]))
+          #forward_list.append(torch.nn.utils.spectral_norm( nn.Linear(input_dim[i], output_dim[i]) ))
+          forward_list.append( nn.Linear(input_dim[i], output_dim[i]) )
 
         self.forward_list = nn.ModuleList(forward_list)
         self.activation = F.relu
@@ -247,6 +271,11 @@ class SkewOperator(nn.Module):
         self.output_scaling_ = torch.ones(n_outputs)
         self.output_scaling_mat_ = torch.eye(n_outputs)*self.output_scaling_ 
         self.input_scaling_mat_ = torch.eye(n_outputs)     
+
+    def remove_spectral_norm(self):
+      for i in range(0,self.num_layers):
+        #torch.nn.utils.parametrize.remove_parametrizations(self.forward_list[i],"weight")
+        torch.nn.utils.remove_spectral_norm(self.forward_list[i],"weight")
 
 
     def forward(self,x,return_stiffness=False):
