@@ -40,7 +40,6 @@ class CompositeOperator(nn.Module):
             operator.remove_spectral_norm()
 
 
-
 class NpdOperator(nn.Module):
     def __init__(self,n_hidden_layers,n_neurons_per_layer,n_inputs,n_outputs):
         super(NpdOperator, self).__init__()
@@ -63,6 +62,7 @@ class NpdOperator(nn.Module):
 
     def remove_spectral_norm(self):
         self.SpdOperator.remove_spectral_norm()
+
 
 class SpdOperator(nn.Module):
     def __init__(self,n_hidden_layers,n_neurons_per_layer,n_inputs,n_outputs):
@@ -127,7 +127,6 @@ class SpdOperator(nn.Module):
       for i in range(0,self.num_layers):
         #torch.nn.utils.parametrize.remove_parametrizations(self.forward_list[i])
         torch.nn.utils.remove_spectral_norm(self.forward_list[i],"weight")
-
 
 
     def set_scalings(self,input_scaling,output_scaling):
@@ -399,19 +398,165 @@ class StandardOperator(nn.Module):
         self.forward_list[-1].bias[0:final_weights.shape[0]] = final_bias[:]
 
 
+class StandardLinearOperator(nn.Module):
+    def __init__(self,n_states,n_params,n_outputs):
+        super(StandardLinearOperator, self).__init__()
+
+        # assuming inputs are cat([states,params],axis=1)
+        # states are [n_samples,n_states,n_outputs]
+        # params are [n_samples,n_params,n_outputs]
+        self.n_states = n_states
+        self.n_params = n_params
+
+        # Learnable tensor -- unstructured
+        self.T = nn.Parameter(torch.randn([n_outputs,n_states,n_params]))
+
+        # Do nothings
+        n_inputs = n_states + n_params
+        self.input_scaling_ = torch.ones(n_inputs)
+        self.output_scaling_ = torch.ones(n_outputs)
+
+    def set_scalings(self,input_scaling,output_scaling):
+      # Left in to not rock the boat
+      self.input_scaling_[:] = input_scaling
+      self.output_scaling_[:] = output_scaling
+
+    def forward(self,ins):
+      # Separate out states and parameters
+      x  = ins[:,:self.n_states]
+      mu = ins[:,self.n_states:]
+
+      # Compute product (T*mu)x
+      result = torch.einsum('ijp,bj,bp->bi',self.T,x,mu)
+      return result[:,:]
+
+
+class SkewLinearOperator(nn.Module):
+    def __init__(self,n_states,n_params,n_outputs,skew=True):
+        super(SkewLinearOperator, self).__init__()
+
+        # set dims and indices based on skew or sym
+        if not skew: 
+          dim = int(n_states*(n_states+1)/2)
+          idx = torch.tril_indices(n_states,n_states,offset=0)
+        else:
+          dim = int(n_states*(n_states-1)/2)
+          idx = torch.tril_indices(n_states,n_states,offset=-1)
+        self.idx  = idx
+        self.skew = skew
+
+        # Learnable tensor -- stored as mtx
+        self.mat = nn.Parameter(torch.randn([dim,n_params]))
+
+        # assuming inputs are cat([states,params],axis=1)
+        self.n_states = n_states
+        self.n_params = n_params
+
+        # Do nothings
+        n_inputs = n_states + n_params
+        self.input_scaling_ = torch.ones(n_inputs)
+        self.output_scaling_ = torch.ones(n_outputs)
+        self.output_scaling_mat_ = torch.eye(n_outputs)*self.output_scaling_ 
+        self.input_scaling_mat_ = torch.eye(n_outputs)     
+
+    def forward(self,ins):
+      # Separate out states and parameters
+      x  = ins[:,:self.n_states]
+      mu = ins[:,self.n_states:]
+
+      # Fill tensor with learnable parameters
+      S  = torch.zeros(self.n_states,self.n_states,self.n_params)
+      S[self.idx[0],self.idx[1],:] = self.mat
+
+      # Make symmetric or skew
+      St = torch.transpose(S,0,1) 
+      T  = (S+St if not self.skew else S-St)
+
+      # Compute product (T*mu)x
+      result = torch.einsum('ijp,bj,bp->bi',T,x,mu)
+      return result[:,:]
+
+    def set_scalings(self,input_scaling,output_scaling):
+      # Left in to not rock the boat
+      n_outputs = self.output_scaling_.size()[0]
+      self.input_scaling_[:] = input_scaling
+      self.output_scaling_[:] = output_scaling
+      self.output_scaling_mat_[:] = torch.eye(output_scaling.size()[0])*output_scaling
+      self.input_scaling_mat_[:] = torch.eye(n_outputs)/input_scaling[0:n_outputs]
+
+
+class SpdLinearOperator(nn.Module):
+    def __init__(self,n_states,n_params,n_outputs,positive=True):
+        super(SpdLinearOperator, self).__init__()
+
+        # set dims and indices
+        ldim      = int(n_states*(n_states-1)/2)
+        self.lidx = torch.tril_indices(n_states,n_states,offset=-1)
+
+        # Learnable tensor -- stored as 2 matrices
+        # lmat is lower triangle and diag is diagonal part
+        self.lmat = nn.Parameter(torch.randn([ldim,n_params]))
+        self.diag = nn.Parameter(torch.randn([n_states,n_params]))
+        self.fac = (1 if positive else -1)
+
+        # assuming inputs are cat([states,params],axis=1)
+        self.n_states = n_states
+        self.n_params = n_params
+
+        # Do nothings
+        n_inputs = n_states + n_params
+        self.input_scaling_ = torch.ones(n_inputs)
+        self.output_scaling_ = torch.ones(n_outputs)
+        self.output_scaling_mat_ = torch.eye(n_outputs)*self.output_scaling_ 
+        self.input_scaling_mat_ = torch.eye(n_outputs)     
+
+    def forward(self,ins):
+      # Separate out states and parameters
+      x  = ins[:,:self.n_states]
+      mu = ins[:,self.n_states:]
+
+      # Fill tensor with learnable parameters
+      # Softplus hits diagonal, lower triangle is whatever
+      S = torch.zeros(self.n_states,self.n_states,self.n_params)
+      S[self.lidx[0],self.lidx[1],:] = self.lmat
+      S[range(self.n_states),range(self.n_states),:] = F.softplus(self.diag)
+
+      # Symmetrize
+      St = torch.transpose(S,0,1) 
+      T  = self.fac * (S + St)
+
+      # Compute product (T*mu)x
+      result = torch.einsum('ijp,bj,bp->bi',T,x,mu)
+      return result[:,:]
+
+    def set_scalings(self,input_scaling,output_scaling):
+      # Left in to not rock the boat
+      n_outputs = self.output_scaling_.size()[0]
+      self.input_scaling_[:] = input_scaling
+      self.output_scaling_[:] = output_scaling
+      self.output_scaling_mat_[:] = torch.eye(output_scaling.size()[0])*output_scaling
+      self.input_scaling_mat_[:] = torch.eye(n_outputs)/input_scaling[0:n_outputs]
+
+
+
 if __name__ == "__main__":
     n_hidden_layers = 2
     n_neurons_per_layer = 5
-    n_inputs = 5
+    n_states = 5
+    n_params = 2
+    n_inputs = n_states + n_params
     n_outputs = 5
-    inputs = torch.tensor(np.random.normal(size=(10,n_inputs)))
-    parameters = torch.tensor(np.random.normal(size=(10,0)))
+    inputs = torch.tensor(np.random.normal(size=(10,n_states)))
+    parameters = torch.tensor(np.random.normal(size=(10,n_params)))
 
-    
-    StandardMlp = StandardOperator(n_hidden_layers,n_neurons_per_layer,n_inputs,n_outputs)
-    SpdMlp = SpdOperator(n_hidden_layers,n_neurons_per_layer,n_inputs,n_outputs)
-    NpdMlp = NpdOperator(n_hidden_layers,n_neurons_per_layer,n_inputs,n_outputs)
-    SkewMlp = SkewOperator(n_hidden_layers,n_neurons_per_layer,n_inputs,n_outputs)
+    # StandardMlp = StandardOperator(n_hidden_layers,n_neurons_per_layer,n_inputs,n_outputs)
+    StandardMlp = StandardLinearOperator(n_states,n_params,n_outputs)
+    # SpdMlp = SpdOperator(n_hidden_layers,n_neurons_per_layer,n_inputs,n_outputs)
+    SpdMlp = SpdLinearOperator(n_states,n_params,n_outputs,positive=True)
+    NpdMlp = SpdLinearOperator(n_states,n_params,n_outputs,positive=False)
+    # NpdMlp = NpdOperator(n_hidden_layers,n_neurons_per_layer,n_inputs,n_outputs)
+    # SkewMlp = SkewOperator(n_hidden_layers,n_neurons_per_layer,n_inputs,n_outputs)
+    SkewMlp = SkewLinearOperator(n_states,n_params,n_outputs,skew=True)
 
     ops = [StandardMlp,NpdMlp,SkewMlp]
     CompositeMlp = CompositeOperator(ops) 
