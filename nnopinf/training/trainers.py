@@ -120,9 +120,28 @@ def optimize_weights(model,input_dict_data,response_data,training_settings):
   print('==========================')
   print('Training loop')
 
-  pbar = tqdm.tqdm(np.arange(1,training_settings['num-epochs'] + 1), position=0, leave=True)
+  if training_settings['resume']:
+    checkpoint = torch.load(training_settings['output-path'] + '/' + training_settings['model-name'] + '_checkpoint.pth')
+    model.load_state_dict(checkpoint['model_state_dict'])
+    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+    lr_scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
+    start_epoch = checkpoint['epoch']
+    print(f"Resuming training from epoch {start_epoch}")
+  else:
+    start_epoch = 1
+
+  pbar = tqdm.tqdm(np.arange(start_epoch,training_settings['num-epochs'] + 1), position=0, leave=True)
+  checkpoint_freq = 100
   for epoch in pbar:
-  #for epoch in tqdm.tqdm(np.arange(1,training_settings['num-epochs'] + 1)):
+      # Assuming `model` is your model and `optimizer` is your optimizer
+      if epoch % checkpoint_freq == 0:
+        checkpoint = {
+          'epoch': epoch,  # Current epoch number
+          'model_state_dict': model.state_dict(),
+          'optimizer_state_dict': optimizer.state_dict(),
+          'scheduler_state_dict': lr_scheduler.state_dict(),
+        }
+        torch.save(checkpoint, training_settings['output-path'] + '/' + training_settings['model-name'] + '_checkpoint.pth')
   
       # monitor training loss
       train_loss = 0.0
