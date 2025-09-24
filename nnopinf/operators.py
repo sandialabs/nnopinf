@@ -1,3 +1,4 @@
+import sys
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -95,6 +96,7 @@ class SpdOperator(nn.Module):
         self.output_scaling_ = torch.ones(n_outputs)
         self.input_scaling_mat_ = torch.eye(n_outputs)     
         self.output_scaling_mat_ = torch.eye(n_outputs)     
+        self.scalings_set_ = False
 
     def forward(self,x,return_stiffness=False):
       y = x/self.input_scaling_[None] 
@@ -103,21 +105,21 @@ class SpdOperator(nn.Module):
 
       y = self.forward_list[-1](y)
 
-      K = torch.zeros(y.shape[0],self.n_outputs,self.n_outputs)
+      K = torch.zeros(y.shape[0],self.n_outputs,self.n_outputs,device=y.device)
       
       K[:,self.idx[0],self.idx[1]] = y[:,0:self.idx[0].size]
 
-      KT = torch.transpose(K,2,1)
-
-      K = torch.einsum('ijk,ikl->ijl',K,KT)
-
+      #KT = torch.transpose(K,2,1)
+      #K = torch.einsum('ijk,ikl->ijl',K,KT)
+      K = torch.bmm(K, K.transpose(1, 2))
 
       #K = L D L^T 
-      
-      K = torch.einsum('ij,njk->nik',self.output_scaling_mat_,K) 
-      K = torch.einsum('nij,jk->nik',K,self.input_scaling_mat_) 
+      if self.scalings_set_:
+        K = torch.einsum('ij,njk->nik',self.output_scaling_mat_,K) 
+        K = torch.einsum('nij,jk->nik',K,self.input_scaling_mat_) 
 
       result = torch.einsum('ijk,ik->ij',K,x[:,0:self.n_outputs] )
+      #result = torch.bmm(K, x[:, :self.n_outputs].unsqueeze(2)).squeeze(2)
       if return_stiffness:
           return result, K
       else:
@@ -130,6 +132,7 @@ class SpdOperator(nn.Module):
 
 
     def set_scalings(self,input_scaling,output_scaling):
+      self.scalings_set_ = True
       n_outputs = self.output_scaling_.size()[0]
       self.input_scaling_[:] = input_scaling
       self.output_scaling_[:] = output_scaling
@@ -192,23 +195,26 @@ class MatrixOperator(nn.Module):
         self.output_scaling_ = torch.ones(output_shape[0])
         self.output_scaling_mat_ = torch.eye(output_shape[0])*self.output_scaling_ 
         self.input_scaling_mat_ = torch.eye(output_shape[1])
+        self.scalings_set_ = False
 
     def forward(self,x,return_stiffness=False):
       y = x/self.input_scaling_[None] 
       for i in range(0,self.num_layers-1):
         y = self.activation(self.forward_list[i](y))
       y = self.forward_list[-1](y)
-      A = torch.zeros(y.shape[0],self.output_shape[0],self.output_shape[1])
-      A[:] = torch.reshape(y,A.shape)
-      A = torch.einsum('ij,njk->nik',self.output_scaling_mat_,A) 
-      A = torch.einsum('nij,jk->nik',A,self.input_scaling_mat_) 
+      A = torch.reshape(y,(y.shape[0],self.output_shape[0],self.output_shape[1]))
+      if self.scalings_set_:
+        A = torch.einsum('ij,njk->nik',self.output_scaling_mat_,A) 
+        A = torch.einsum('nij,jk->nik',A,self.input_scaling_mat_) 
       result = torch.einsum('ijk,ik->ij',A,x[:,0:self.output_shape[1]])
+      #result = torch.bmm(A, x[:, :self.output_shape[1]].unsqueeze(2)).squeeze(2)
       if return_stiffness:
           return result[:,:],A
       else:
           return result[:,:]
 
     def set_scalings(self,input_scaling,output_scaling):
+      self.scalings_set_ = True
       n_inputs = self.output_shape[1]
       self.input_scaling_[:] = input_scaling
       self.output_scaling_[:] = output_scaling

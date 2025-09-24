@@ -73,11 +73,11 @@ class MaxAbsNormalizer:
     return self.offset_value,self.scaling_value
 
   def apply_scaling(self,x):
-    x_normalized = x/self.scaling_value
+    x_normalized = x/(self.scaling_value + 1.e-30)
     return x_normalized
 
   def apply_inverse_scaling(self,x_normalized):
-    x = x_normalized*self.scaling_value
+    x = x_normalized*(self.scaling_value + 1.e-30)
     return x
 
 
