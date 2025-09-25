@@ -6,7 +6,31 @@ import tqdm
 torch.set_default_dtype(torch.float64)
 import os
 import nnopinf
+def bfgs_step(model,loss_function,weight_decay,optimizer_bfgs,input_dict_data,train_data_torch):
+    loss_list = []
+    def closure():
+      optimizer_bfgs.zero_grad()
+      model_inputs = {}
+      start_index = 0
+      for key in list(input_dict_data.keys()):
+          end_index = start_index + input_dict_data[key].training_data.shape[1]             
+          model_inputs[key] = torch.from_numpy(train_data_torch[:,start_index:end_index])
+          start_index = end_index*1
+      response_t = torch.from_numpy(train_data_torch[:,start_index::])
+      yhat = model(model_inputs)
+      loss = loss_function(response_t,yhat)
+      train_loss = loss*response_t.size(0)
+      n_samples = response_t.size(0)
+      train_loss = train_loss/n_samples
+      param_l2_norm = torch.linalg.vector_norm(torch.cat([p.view(-1) for p in model.parameters()]), ord=2)**2
+      train_loss += weight_decay*param_l2_norm 
+      loss_list.append(train_loss.detach().numpy())
+      objective = train_loss 
+      objective.backward()
+      return objective
 
+    optimizer_bfgs.step(closure)
+    return loss_list[0] 
 
 class DataClass:
   '''
@@ -94,24 +118,29 @@ def optimize_weights(model,input_dict_data,response_data,training_settings):
   
   #Loss function
   n_epochs = training_settings['num-epochs']
-  def my_criterion(y,yhat,epoch):
-    #rom_dim = y.shape[-1]
-    #scaling = 1./torch.mean(torch.abs(y),0)
-    #epochs_per_dim = n_epochs / rom_dim
-    #rom_dim_to_train = rom_dim#int( np.ceil(epoch/epochs_per_dim) )
-    #print(rom_dim_to_train)
-    #loss_mse = torch.mean( (( y[:,0:rom_dim_to_train] - yhat[:,0:rom_dim_to_train])**2 ) )  / torch.mean(y[:,0:rom_dim_to_train]**2 + 1e-6)
+  def my_criterion(y,yhat):
     loss_mse = torch.mean( (( y - yhat)**2 ) )  / torch.mean(y**2 + 1e-3)
     return loss_mse
 
   #Optimizer
+  #training_settings['optimizer'] = 'MIXED'
   learning_rate = training_settings['learning-rate']
   if training_settings['optimizer'] == "ADAM":
       optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate,weight_decay=training_settings['weight-decay'])
-  if training_settings['optimizer'] == "LBFGS":
-      optimizer = torch.optim.LBFGS(model.parameters(), lr=learning_rate, max_iter=20, max_eval=None, tolerance_grad=1e-03, tolerance_change=1e-05, history_size=50, line_search_fn="strong_wolfe")
-  lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=training_settings['lr-decay'])
+      lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer, gamma=training_settings['lr-decay'])
+      if training_settings['LBFGS-acceleration']:
+        optimizer_bfgs = torch.optim.LBFGS(model.parameters(), lr=1, max_iter=50, max_eval=None, tolerance_grad=1e-03, tolerance_change=1e-05, history_size=100, line_search_fn="strong_wolfe")
 
+  if training_settings['optimizer'] == "LBFGS":
+      optimizer = torch.optim.LBFGS(model.parameters(), lr=1., max_iter=20, max_eval=None, tolerance_grad=1e-03, tolerance_change=1e-05, history_size=100)
+
+
+  if training_settings['optimizer'] == "MIXED":
+      optimizer_adam = torch.optim.Adam(model.parameters(), lr=learning_rate,weight_decay=training_settings['weight-decay'])
+      optimizer_bfgs = torch.optim.LBFGS(model.parameters(), lr=1, max_iter=50, max_eval=None, tolerance_grad=1e-03, tolerance_change=1e-05, history_size=100, line_search_fn="strong_wolfe")
+      lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer=optimizer_adam, gamma=training_settings['lr-decay'])
+
+  
  
   #Epochs
   train_loss_hist = np.zeros(0)
@@ -128,6 +157,8 @@ def optimize_weights(model,input_dict_data,response_data,training_settings):
     checkpoint = torch.load(training_settings['output-path'] + '/' + training_settings['model-name'] + '_checkpoint.pth')
     model.load_state_dict(checkpoint['model_state_dict'])
     optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+    if training_settings['LBFGS-acceleration']:
+      optimizer_bfgs.load_state_dict(checkpoint['optimizer_bfgs_state_dict'])
     lr_scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
     start_epoch = checkpoint['epoch']
     print(f"Resuming training from epoch {start_epoch}")
@@ -136,110 +167,112 @@ def optimize_weights(model,input_dict_data,response_data,training_settings):
 
   pbar = tqdm.tqdm(np.arange(start_epoch,training_settings['num-epochs'] + 1), position=0, leave=True)
   checkpoint_freq = 100
+  wall_time_hist = np.zeros(0)
   for epoch in pbar:
-      # Assuming `model` is your model and `optimizer` is your optimizer
-      if epoch % checkpoint_freq == 0:
-        checkpoint = {
-          'epoch': epoch,  # Current epoch number
-          'model_state_dict': model.state_dict(),
-          'optimizer_state_dict': optimizer.state_dict(),
-          'scheduler_state_dict': lr_scheduler.state_dict(),
-        }
-        torch.save(checkpoint, training_settings['output-path'] + '/' + training_settings['model-name'] + '_checkpoint.pth')
- 
-      if isinstance(optimizer,torch.optim.LBFGS):
-          train_loss_history = np.zeros(0)
-          train_loss = 0.
-          def closure():
-              optimizer.zero_grad()
-              model_inputs = {}
-              start_index = 0
-              for key in list(input_dict_data.keys()):
-                  end_index = start_index + input_dict_data[key].training_data.shape[1]             
-                  model_inputs[key] = torch.from_numpy(train_data_torch[:,start_index:end_index])
-                  start_index = end_index*1
-              response_t = torch.from_numpy(train_data_torch[:,start_index::])
-              yhat = model(model_inputs)
-              loss = my_criterion(response_t,yhat,epoch)
-              train_loss = loss*response_t.size(0)
-              n_samples = response_t.size(0)
-              train_loss = train_loss/n_samples
-              objective = train_loss 
-              objective.backward()
-              pbar.set_description(f"Epoch: {epoch}, Training loss: {train_loss:.4f}")
-              return objective              
+    # Assuming `model` is your model and `optimizer` is your optimizer
+    if epoch % checkpoint_freq == 0:
+      checkpoint = {
+        'epoch': epoch,  # Current epoch number
+        'model_state_dict': model.state_dict(),
+        'optimizer_state_dict': optimizer.state_dict(),
+      }
+      if training_settings['optimizer'] == 'ADAM':
+        checkpoint['scheduler_state_dict'] = lr_scheduler.state_dict()
+      if training_settings['LBFGS-acceleration']:
+        checkpoint['optimizer_bfgs_state_dict'] = optimizer_bfgs.state_dict() 
+      torch.save(checkpoint, training_settings['output-path'] + '/' + training_settings['model-name'] + '_checkpoint.pth')
 
-          optimizer.step(closure)
-          train_loss_hist = np.append(train_loss_hist,train_loss)
-      if isinstance(optimizer,torch.optim.Adam):
-          # monitor training loss
-          train_loss = 0.0
-          #Training
-          n_samples = 0
-          for data in training_data_loader:
-              data_d = data.to(device,dtype=torch.float64)
-              model_inputs = {}
-              start_index = 0
-              for key in list(input_dict_data.keys()):
-                  end_index = start_index + input_dict_data[key].training_data.shape[1]             
-                  model_inputs[key] = data_d[:,start_index:end_index]
-                  start_index = end_index*1
-              response_t = data_d[:,start_index::]
-              optimizer.zero_grad()
-              yhat = model(model_inputs)
-              loss = my_criterion(response_t,yhat,epoch)
-              loss.backward()
-              optimizer.step()
-              train_loss += loss.item()*response_t.size(0)
-              n_samples += response_t.size(0)
+    if isinstance(optimizer,torch.optim.LBFGS):
+        train_loss_history = np.zeros(0)
+        train_loss = bfgs_step(model,my_criterion,training_settings['weight-decay'],optimizer,input_dict_data,train_data_torch)
+        train_loss_hist = np.append(train_loss_hist,train_loss)
+        wall_time_hist = np.append(wall_time_hist,time.time() - t0)
+        if epoch > 20:
+          if np.allclose(train_loss_hist[-20],train_loss):
+            print('BFGS stalled, ending')
+            break
+        pbar.set_description(f"Epoch: {epoch}, Training loss: {train_loss:.4f}")
+
+    if isinstance(optimizer,torch.optim.Adam):
+        # Start with BFGS if enabled
+        if training_settings['LBFGS-acceleration']:
+          if (epoch-1) % training_settings['LBFGS-acceleration-epoch-frequency'] == 0:
+            for bfgs_iteration in range(0,training_settings['LBFGS-acceleration-iterations']):
+              optimizer_bfgs = torch.optim.LBFGS(model.parameters(), lr=1, max_iter=50, max_eval=None, tolerance_grad=1e-03, tolerance_change=1e-05, history_size=100, line_search_fn="strong_wolfe")
+              bfgs_step(model,my_criterion,training_settings['weight-decay'],optimizer_bfgs,input_dict_data,train_data_torch)
+
+        # monitor training loss
+        train_loss = 0.0
+        #Training
+        n_samples = 0
+        for data in training_data_loader:
+            data_d = data.to(device,dtype=torch.float64)
+            model_inputs = {}
+            start_index = 0
+            for key in list(input_dict_data.keys()):
+                end_index = start_index + input_dict_data[key].training_data.shape[1]             
+                model_inputs[key] = data_d[:,start_index:end_index]
+                start_index = end_index*1
+            response_t = data_d[:,start_index::]
+            optimizer.zero_grad()
+            yhat = model(model_inputs)
+            loss = my_criterion(response_t,yhat)
+            loss.backward()
+            optimizer.step()
+            train_loss += loss.item()*response_t.size(0)
+            n_samples += response_t.size(0)
+  
+  
+        train_loss = train_loss/n_samples
+        train_loss_hist = np.append(train_loss_hist,train_loss)
+  
     
+        # monitor validation loss
+        val_loss = 0.0
+        #Training
+        n_samples = 0
+        for data in val_data_loader:
+            data_d = data.to(device,dtype=torch.float64)
+            model_inputs = {}
+            start_index = 0
+            for key in list(input_dict_data.keys()):
+                end_index = start_index + input_dict_data[key].training_data.shape[1]             
+                model_inputs[key] = data_d[:,start_index:end_index]
+                start_index = end_index*1
+            response_t = data_d[:,start_index::]
+            yhat = model.forward(model_inputs)
+            loss = my_criterion(response_t,yhat)
+            val_loss += loss.item()*response_t.size(0)
+            n_samples += response_t.size(0)
+   
+   
+        val_loss = val_loss/n_samples
+        val_loss_hist = np.append(val_loss_hist,val_loss)
+        wall_time_hist = np.append(wall_time_hist,time.time() - t0)
+ 
+        lr_scheduler.step()
+        lr = lr_scheduler.get_last_lr()[0]      
+        pbar.set_description(f"Epoch: {epoch}, Learning rate: {lr:.6f}, Training loss: {train_loss:.6f}, Validation loss: {val_loss:.6f}")
+        
+  
+        #if training_settings['print-training-output']:
+        #  print('Epoch: {} \tLearning rate: {:.6f} \tTraining Loss: {:.6f} \tTesting Loss: {:.6f}'.format(epoch, lr, train_loss,val_loss,lr))
+        #  #print("{:3d}       {:0.6f}        {:0.6f}     {:0.3e}".format(epoch, train_loss, val_loss, lr))
+        #  print('Time: {:.6f}'.format(time.time() - t0))
     
-          train_loss = train_loss/n_samples
-          train_loss_hist = np.append(train_loss_hist,train_loss)
-    
-      
-          # monitor validation loss
-          val_loss = 0.0
-          #Training
-          n_samples = 0
-          for data in val_data_loader:
-              data_d = data.to(device,dtype=torch.float64)
-              model_inputs = {}
-              start_index = 0
-              for key in list(input_dict_data.keys()):
-                  end_index = start_index + input_dict_data[key].training_data.shape[1]             
-                  model_inputs[key] = data_d[:,start_index:end_index]
-                  start_index = end_index*1
-              response_t = data_d[:,start_index::]
-              yhat = model.forward(model_inputs)
-              loss = my_criterion(response_t,yhat,epoch)
-              val_loss += loss.item()*response_t.size(0)
-              n_samples += response_t.size(0)
-     
-     
-          val_loss = val_loss/n_samples
-          val_loss_hist = np.append(val_loss_hist,val_loss)
-    
-          lr_scheduler.step()
-          lr = lr_scheduler.get_last_lr()[0]      
-      
-          # Custom message or additional information
-          #pbar.set_description('Epoch: {} \tLearning rate: {:.6f} \tTraining Loss: {:.6f} \tTesting Loss: {:.6f}'.format(epoch, lr, train_loss,val_loss,lr))
-          pbar.set_description(f"Epoch: {epoch}, Learning rate: {lr:.4f}, Training loss: {train_loss:.4f}, Validation loss: {val_loss:.4f}")
-    
-    
-          #if training_settings['print-training-output']:
-          #  print('Epoch: {} \tLearning rate: {:.6f} \tTraining Loss: {:.6f} \tTesting Loss: {:.6f}'.format(epoch, lr, train_loss,val_loss,lr))
-          #  #print("{:3d}       {:0.6f}        {:0.6f}     {:0.3e}".format(epoch, train_loss, val_loss, lr))
-          #  print('Time: {:.6f}'.format(time.time() - t0))
-      
-          #if (epoch > 1000):
-          #  val_loss_running_mean = np.mean(val_loss_hist[-400::])
-          #  val_loss_running_mean_old = np.mean(val_loss_hist[-800:-400])
-          #  if (val_loss_running_mean_old < val_loss_running_mean):
-          #    print('MSE on validation set no longer decreasing, exiting training')
-          #    epoch = 1e10
-      epoch += 1
+        #if (epoch > 1000):
+        #  val_loss_running_mean = np.mean(val_loss_hist[-400::])
+        #  val_loss_running_mean_old = np.mean(val_loss_hist[-800:-400])
+        #  if (val_loss_running_mean_old < val_loss_running_mean):
+        #    print('MSE on validation set no longer decreasing, exiting training')
+        #    epoch = 1e10
+    epoch += 1
+
+  # Finish with BFGS
+  if training_settings['LBFGS-acceleration'] and training_settings['optimizer'] == 'ADAM':
+      optimizer_bfgs = torch.optim.LBFGS(model.parameters(), lr=1, max_iter=50, max_eval=None, tolerance_grad=1e-03, tolerance_change=1e-05, history_size=100, line_search_fn="strong_wolfe")
+      for bfgs_iteration in range(0,training_settings['LBFGS-acceleration-iterations']):
+          bfgs_step(model,my_criterion,training_settings['weight-decay'],optimizer_bfgs,input_dict_data,train_data_torch)
 
   wall_time = time.time() - t0
   print('==========================')
@@ -257,7 +290,7 @@ def optimize_weights(model,input_dict_data,response_data,training_settings):
   model.set_scalings(input_scalings,output_scalings)
   torch.save(model, training_settings['output-path'] + '/' + training_settings['model-name'] + '.pt')
   model.save_operators(training_settings['output-path'] )
-  np.savez(training_settings['output-path'] + '/' + training_settings['model-name'] + '_training_stats.npz',training_loss=train_loss_hist,validation_loss=val_loss_hist,wall_time=wall_time)
+  np.savez(training_settings['output-path'] + '/' + training_settings['model-name'] + '_training_stats.npz',training_loss=train_loss_hist,validation_loss=val_loss_hist,wall_time=wall_time,wall_time_hist = wall_time_hist,training_settings = training_settings)
   #with open(modelDir + '/' + modelName + '_feature_normalizer.pickle', 'wb') as file:
   #  pickle.dump(trainingData.feature_normalizer, file) 
   #with open(modelDir + '/' + modelName + '_response_normalizer.pickle', 'wb') as file:
