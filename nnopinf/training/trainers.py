@@ -80,8 +80,8 @@ def prepare_data(inputs, response, validation_percent, training_settings):
  
     samples_array = np.array(range(0,n_samples),dtype='int')
     np.random.shuffle(samples_array)
-    train_samples = samples_array[0:int(np.floor(train_percent*n_samples))]
-    val_samples = samples_array[int(np.floor(train_percent*n_samples))::]
+    train_samples = samples_array#[0:int(np.floor(train_percent*n_samples))]
+    val_samples = train_samples#samples_array[int(np.floor(train_percent*n_samples))::]
 
     inputs_data = {}
     for key in list(inputs.keys()):
@@ -119,7 +119,11 @@ def optimize_weights(model,input_dict_data,response_data,training_settings):
   #Loss function
   n_epochs = training_settings['num-epochs']
   def my_criterion(y,yhat):
-    loss_mse = torch.mean( (( y - yhat)**2 ) )  / torch.mean(y**2 + 1e-3)
+    n_modes = y.shape[-1]
+    #weighting = torch.tensor(np.logspace(2,0,n_modes))
+    #print(torch.mean( (y - yhat)**2,axis=0)) 
+    loss_mse =torch.mean( (( y - yhat)**2 ) ) # / torch.mean(y**2 + 1e-3)
+    #loss_mse = torch.mean( torch.mean( (y - yhat)**2 ,axis=0) / ( torch.mean(y**2,axis=0)+ 1e-5) )
     return loss_mse
 
   #Optimizer
@@ -159,11 +163,17 @@ def optimize_weights(model,input_dict_data,response_data,training_settings):
     optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
     if training_settings['LBFGS-acceleration']:
       optimizer_bfgs.load_state_dict(checkpoint['optimizer_bfgs_state_dict'])
+
+
     lr_scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
     start_epoch = checkpoint['epoch']
     print(f"Resuming training from epoch {start_epoch}")
   else:
     start_epoch = 1
+
+  if training_settings['hierarchical-update'] and training_settings['resume'] == False:
+    update_model = torch.load(training_settings['hierarchical-update-model'],weights_only=False)
+    model.hierarchical_update(update_model)
 
   pbar = tqdm.tqdm(np.arange(start_epoch,training_settings['num-epochs'] + 1), position=0, leave=True)
   checkpoint_freq = 100
@@ -269,10 +279,10 @@ def optimize_weights(model,input_dict_data,response_data,training_settings):
     epoch += 1
 
   # Finish with BFGS
-  if training_settings['LBFGS-acceleration'] and training_settings['optimizer'] == 'ADAM':
-      optimizer_bfgs = torch.optim.LBFGS(model.parameters(), lr=1, max_iter=50, max_eval=None, tolerance_grad=1e-03, tolerance_change=1e-05, history_size=100, line_search_fn="strong_wolfe")
-      for bfgs_iteration in range(0,training_settings['LBFGS-acceleration-iterations']):
-          bfgs_step(model,my_criterion,training_settings['weight-decay'],optimizer_bfgs,input_dict_data,train_data_torch)
+  #if training_settings['LBFGS-acceleration'] and training_settings['optimizer'] == 'ADAM':
+  #    optimizer_bfgs = torch.optim.LBFGS(model.parameters(), lr=1, max_iter=50, max_eval=None, tolerance_grad=1e-03, tolerance_change=1e-05, history_size=100, line_search_fn="strong_wolfe")
+  #    for bfgs_iteration in range(0,training_settings['LBFGS-acceleration-iterations']):
+  #        bfgs_step(model,my_criterion,training_settings['weight-decay'],optimizer_bfgs,input_dict_data,train_data_torch)
 
   wall_time = time.time() - t0
   print('==========================')
