@@ -1,4 +1,7 @@
-import nnopinf.models
+from nnopinf.models import Model
+#from nnopinf.operators import CompositeOperator, VectorOffsetOperator, SpdOperator, SkewOperator, StandardOperator, MatrixOperator, LinearAffineTensorOperator, LinearAffineSkewTensorOperator, LinearAffineSpdTensorOperator 
 import nnopinf.operators
 import nnopinf.training
-import nnopinf.variables
+import nnopinf.steppers
+from nnopinf.variables import *
+

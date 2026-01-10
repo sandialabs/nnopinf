@@ -6,7 +6,7 @@ def get_default_settings(optimizer='ADAM'):
       'optimizer': 'ADAM',
       'LBFGS-acceleration': True,
       'LBFGS-acceleration-epoch-frequency' : 200,
-      'LBFGS-acceleration-iterations' : 25,
+      'LBFGS-acceleration-iterations' : 50,
       'num-epochs': 10000,
       'batch-size': 50,
       'learning-rate': 3.e-3,

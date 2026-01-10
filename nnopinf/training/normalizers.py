@@ -90,8 +90,8 @@ class NoOpNormalizer:
   def __init__(self,x):
     assert(x.ndim == 2)
     n_features = np.shape(x)[1]
-    self.scaling_value = 0
-    self.offset_value = 1
+    self.scaling_value = np.ones(n_features)
+    self.offset_value = np.zeros(n_features)
     self.normalization_type='None'
 
   def get_offset_and_scaling_values(self):

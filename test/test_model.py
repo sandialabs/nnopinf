@@ -10,13 +10,10 @@ if __name__=='__main__':
     n_params = 2
     n_hidden_layers = 2
     n_neurons_per_layer = 5
-    n_inputs = rom_dim + n_params
-    n_outputs = rom_dim
 
     ## Design operators for the state
     NpdMlp = operators.NpdOperator(n_hidden_layers,n_neurons_per_layer,n_inputs,n_outputs)
     SkewMlp = operators.SkewOperator(n_hidden_layers,n_neurons_per_layer,n_inputs,n_outputs)
-    MyCompositeOperator = operators.CompositeOperator([NpdMlp,SkewMlp])
 
 
     ## Design operators for the forcing

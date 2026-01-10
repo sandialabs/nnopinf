@@ -9,12 +9,7 @@ import nnopinf.models as models
 import nnopinf.training
 import torch
 from matplotlib import pyplot as plt
-
 axis_font = {'size':'20'}
-plt.rcParams.update({
-    "text.usetex": True,
-    "font.family": "Serif"
-})
 
 
 def upwind_deriv(u,dx):
@@ -130,47 +125,62 @@ if __name__=='__main__':
     uhat = uhat[...,1:-1]
     
     # Design operators
-    n_hidden_layers = 1 
+    n_hidden_layers = 5
     n_neurons_per_layer = K
     n_inputs = K
     n_outputs = K
 
     # Design operators for the state. 
     # Create to be energy conserving , s.t. uhat_dot \le 0
-    NpdMlp = operators.NpdOperator(n_hidden_layers,n_neurons_per_layer,n_inputs,n_outputs)
-    SkewMlp = operators.SkewOperator(n_hidden_layers,n_neurons_per_layer,n_inputs,n_outputs)
-    NdMlp = operators.CompositeOperator([NpdMlp,SkewMlp])
+    x_input = nnopinf.variables.Variable(size=K,name='x',normalization_strategy='MaxAbs')
+    target = nnopinf.variables.Variable(size=K,name='y',normalization_strategy='MaxAbs')
 
-    # Wrap operator for use by opinf model
-    nd_operator =  models.WrappedOperatorForModel(operator=NdMlp,inputs=("x",),name="nd")
-    my_operators = [nd_operator]
-    my_model = models.OpInfModel( my_operators )
+    NpdMlp = nnopinf.operators.SpdOperator(acts_on=x_input,depends_on=(x_input,),n_hidden_layers=n_hidden_layers,n_neurons_per_layer=n_neurons_per_layer,positive=False)
+    SkewMlp = nnopinf.operators.SkewOperator(acts_on=x_input,depends_on=(x_input,),n_hidden_layers=n_hidden_layers,n_neurons_per_layer=n_neurons_per_layer)
+
+    # Create a model using the two operators 
+    pd_model = nnopinf.models.Model( [NpdMlp,SkewMlp] )
 
     # Train
     training_settings = nnopinf.training.get_default_settings()
     training_settings['batch-size'] = 500
-    training_settings['num-epochs'] = 5000
+    training_settings['num-epochs'] = 10000
     print("Settings are: ",training_settings)
-    inputs = {}
-    inputs['x'] = uhat.transpose()
-    training_settings['x-normalization-strategy'] = 'MaxAbs'
-    nnopinf.training.train(my_model,input_dict=inputs,y=uhat_dot.transpose(),training_settings=training_settings)
-  
- 
-    # Do a forward pass of the model
-    u0 = Phi.transpose() @ myFom.u0
-    my_rom = nn_opinf_rom(my_model)
-    urom,trom = my_rom.solve(u0,dt,et) 
 
-    urom = Phi @ urom
+    x_input.set_data(uhat.transpose())
+    target.set_data(uhat_dot.transpose())
+
+    variables = [x_input]
+    print('Training Positive Definite Model')
+    nnopinf.training.trainers.train(pd_model,variables=variables,y=target,training_settings=training_settings)
+
+    # Compare to the basic approach
+    BasicMlp = nnopinf.operators.StandardOperator(n_outputs=K,depends_on=(x_input,),n_hidden_layers=n_hidden_layers,n_neurons_per_layer=n_neurons_per_layer)
+    basic_model = nnopinf.models.Model( [BasicMlp] )
+    print('Training Basic Model')
+    nnopinf.training.trainers.train(basic_model,variables=variables,y=target,training_settings=training_settings)
+
+ 
+    # Do a forward pass of both models
+    u0 = Phi.transpose() @ myFom.u0
+    pd_rom = nn_opinf_rom(pd_model)
+    u_pdrom,t_ndrom = pd_rom.solve(u0,dt,et) 
+    u_pdrom = Phi @ u_pdrom
+
+    basic_rom = nn_opinf_rom(basic_model)
+    u_basicrom,t_basicrom = basic_rom.solve(u0,dt,et) 
+    u_basicrom = Phi @ u_basicrom
 
     # Check errors and plot
-    relative_error = np.linalg.norm(urom - u)/np.linalg.norm(u)
-    print('Relative error = ' + str(relative_error))
+    relative_error = np.linalg.norm(u_pdrom - u)/np.linalg.norm(u)
+    print('ND ROM relative error = ' + str(relative_error))
+    relative_error = np.linalg.norm(u_basicrom - u)/np.linalg.norm(u)
+    print('Basic ROM relative error = ' + str(relative_error))
 
     plt.close("all") 
     plt.plot(myFom.x,u[:,-1],color='black',label='FOM')
-    plt.plot(myFom.x,urom[:,-1],'--',color='blue',label='NNOPINF-PD')
+    plt.plot(myFom.x,u_pdrom[:,-1],'--',color='blue',label='NNOPINF (Positive Definite)')
+    plt.plot(myFom.x,u_basicrom[:,-1],'--',color='green',label='NNOPINF (No structure)')
     plt.xlabel(r'$x$',**axis_font)
     plt.ylabel(r'$u(x)$',**axis_font)
     plt.legend()

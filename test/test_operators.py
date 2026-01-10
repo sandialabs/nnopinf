@@ -1,52 +1,70 @@
 import nnopinf
 import nnopinf.operators
-
 import torch
 import numpy as np
 
-if __name__ == "__main__":
-    n_hidden_layers = 2
-    n_neurons_per_layer = 5
-    n_inputs = 5
-    n_outputs = 5
-    inputs = torch.tensor(np.random.normal(size=(10,n_inputs)))
-    parameters = torch.tensor(np.random.normal(size=(10,0)))
+
+def test_spd_operator():
+    torch.manual_seed(1)
+    np.random.seed(1)
+
+    x_input = nnopinf.Variable(size=3,name="x")
+    mu_input = nnopinf.Variable(size=2,name="mu")
+    NpdMlp = nnopinf.operators.SpdOperator(acts_on=x_input,depends_on=(x_input,mu_input,),n_hidden_layers=2,n_neurons_per_layer=2,positive=False)
+ 
+    torch.manual_seed(1)
+    np.random.seed(1)
+
+    SpdMlp = nnopinf.operators.SpdOperator(acts_on=x_input,depends_on=(x_input,mu_input,),n_hidden_layers=2,n_neurons_per_layer=2,positive=True)
     
-      
-    StandardMlp = nnopinf.operators.StandardOperator(n_hidden_layers,n_neurons_per_layer,n_inputs,n_outputs)
-    SpdMlp = nnopinf.operators.SpdOperator(n_hidden_layers,n_neurons_per_layer,n_inputs,n_outputs)
-    NpdMlp = nnopinf.operators.NpdOperator(n_hidden_layers,n_neurons_per_layer,n_inputs,n_outputs)
-    SkewMlp = nnopinf.operators.SkewOperator(n_hidden_layers,n_neurons_per_layer,n_inputs,n_outputs)
-    MatrixMlp = nnopinf.operators.MatrixOperator(n_hidden_layers,n_neurons_per_layer,n_inputs,(n_outputs,n_inputs))
-   
-    ops = [SpdMlp,StandardMlp,SkewMlp,MatrixMlp]
-    CompositeMlp = nnopinf.operators.CompositeOperator(ops)
-    inputs = torch.cat((inputs,parameters),1)
-    r1 = StandardMlp.forward(inputs)
-    r2 = SpdMlp.forward(inputs)
-    r3 = SkewMlp.forward(inputs)
-    r4 = MatrixMlp.forward(inputs)
-    r5 = CompositeMlp(inputs)
-    assert np.allclose( r5.detach().numpy(), (r1 + r2 + r3 + r4).detach().numpy())
+    x = torch.randn([5,3])
+    mu = torch.randn([5,2])
+    inputs = {}
+    inputs['x'] = x
+    inputs['mu'] = mu
 
-    ## Now test scaling
-    for operator in ops:
-      input_scalings = torch.tensor(np.random.normal(size=(n_inputs)))
-      output_scalings = torch.tensor(np.random.normal(size=(n_outputs)))
-    
-      inputs_scaled = inputs/input_scalings[None] 
-      output = operator.forward(inputs_scaled)*output_scalings[None]
+    output,output_mat = SpdMlp.forward(inputs,return_jacobian=True)
+    # Ensure y = Ax
+    assert torch.allclose(output,torch.einsum('nij,nj->ni',output_mat , x))
+    # Ensure SPD
+    output_mat_i = output_mat[0].detach().numpy()
+    np.linalg.cholesky(output_mat_i)
 
-      operator.set_scalings(input_scalings,output_scalings)
-      output2 = operator.forward(inputs)
-      assert np.allclose(operator.input_scaling_,input_scalings)
-      assert np.allclose(operator.output_scaling_,output_scalings)
-      assert np.allclose(output.detach().numpy(),output2.detach().numpy())
+    # Ensure NPD operator is the negative of SPD operator 
+    output_n,output_mat_n = NpdMlp.forward(inputs,return_jacobian=True)
+    assert torch.allclose(output,-1.0*output_n)
+    assert torch.allclose(output_mat,-1.0*output_mat_n)
 
+ 
+def test_skew_operator():
+    torch.manual_seed(1)
+    np.random.seed(1)
+    x_input = nnopinf.Variable(size=3,name="x")
+    mu_input = nnopinf.Variable(size=2,name="mu")
+    SkewMlp = nnopinf.operators.SkewOperator(acts_on=x_input,depends_on=(x_input,mu_input,),n_hidden_layers=2,n_neurons_per_layer=2)
+    x = torch.randn([5,3])
+    mu = torch.randn([5,2])
+    inputs = {}
+    inputs['x'] = x
+    inputs['mu'] = mu
+    output,output_mat = SkewMlp.forward(inputs,return_jacobian=True)
+    # Ensure y = Ax
+    assert torch.allclose(output,torch.einsum('nij,nj->ni',output_mat , x))
+    # Ensure Skew
+    output_mat_i = output_mat[0].detach().numpy()
+    assert np.allclose(output_mat_i,-output_mat_i.transpose())
 
-    ## Test heirarchical update
-    SpdMlp = nnopinf.operators.SpdOperator(n_hidden_layers,n_neurons_per_layer,5,5)
-    SpdMlpFine = nnopinf.operators.SpdOperator(n_hidden_layers,n_neurons_per_layer,10,10)
-    SpdMlpFine.heirarchical_update(SpdMlp)
-  
+def test_standard_operator():
+    torch.manual_seed(1)
+    np.random.seed(1)
+    x_input = nnopinf.Variable(size=3,name="x")
+    mu_input = nnopinf.Variable(size=2,name="mu")
+    StandardMlp = nnopinf.operators.StandardOperator(n_outputs=6,depends_on=(x_input,mu_input,),n_hidden_layers=2,n_neurons_per_layer=2)
+    x = torch.randn([5,3])
+    mu = torch.randn([5,2])
+    inputs = {}
+    inputs['x'] = x
+    inputs['mu'] = mu
+    output = StandardMlp.forward(inputs)
+    assert(output.shape[1] == 6)
 
