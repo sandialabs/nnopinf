@@ -8,15 +8,12 @@ from typing import Protocol
 torch.set_default_dtype(torch.float64)
 
 def inputs_to_tensor(inputs,names_to_collect):
-    operator_inputs = None
+    operator_inputs = []
     for input_name in names_to_collect:
-      if operator_inputs is None:
-        operator_inputs = inputs[input_name]
-      else:
-        operator_inputs = torch.cat( (operator_inputs,inputs[input_name]),1)
-    if operator_inputs is None:
-      operator_inputs = torch.zeros((0,0))
-    return operator_inputs 
+      operator_inputs.append(inputs[input_name])
+    if len(operator_inputs) == 0:
+      return torch.zeros((0,0))
+    return torch.cat(operator_inputs, dim=1)
 
 def create_layers(input_size,output_size,n_hidden_layers,n_neurons_per_layer):
       dim = np.zeros(n_hidden_layers+2,dtype='int')
@@ -970,4 +967,3 @@ if __name__ == "__main__":
     r6 = LinearAffineMlp.forward(inputs)
 
     assert np.allclose( (r2+r3).detach().numpy(),r5.detach().numpy())
-
