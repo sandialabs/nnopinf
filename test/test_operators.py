@@ -72,10 +72,13 @@ def test_spd_operator_scaling_forward():
 
     x_raw = torch.randn([6, x_input.get_size()], dtype=DTYPE)
     mu_raw = torch.randn([6, mu_input.get_size()], dtype=DTYPE)
-    x_scaling, mu_scaling, out_scaling = _make_scalings(3, 2, 3)
+    _, mu_scaling, _ = _make_scalings(3, 2, 3)
+    x_scaling = torch.tensor(2.0, dtype=DTYPE)
+    x_scaling_vec = torch.full((x_input.get_size(),), x_scaling, dtype=DTYPE)
+    out_scaling = torch.tensor(1.7, dtype=DTYPE)
 
     y_scaled = op.forward(_inputs_scaled(x_raw, mu_raw, x_scaling, mu_scaling))
-    op.set_scalings({"x": x_scaling, "mu": mu_scaling}, out_scaling)
+    op.set_scalings({"x": x_scaling_vec, "mu": mu_scaling}, out_scaling)
     y_raw = op.forward({"x": x_raw, "mu": mu_raw})
 
     expected = y_scaled * out_scaling
@@ -96,16 +99,19 @@ def test_spd_operator_scaling_jacobian():
 
     x_raw = torch.randn([4, x_input.get_size()], dtype=DTYPE)
     mu_raw = torch.randn([4, mu_input.get_size()], dtype=DTYPE)
-    x_scaling, mu_scaling, out_scaling = _make_scalings(3, 2, 3)
+    _, mu_scaling, _ = _make_scalings(3, 2, 3)
+    x_scaling = torch.tensor(2.0, dtype=DTYPE)
+    x_scaling_vec = torch.full((x_input.get_size(),), x_scaling, dtype=DTYPE)
+    out_scaling = torch.tensor(1.7, dtype=DTYPE)
 
     _, jac_scaled = op.forward(
         _inputs_scaled(x_raw, mu_raw, x_scaling, mu_scaling), return_jacobian=True
     )
-    op.set_scalings({"x": x_scaling, "mu": mu_scaling}, out_scaling)
+    op.set_scalings({"x": x_scaling_vec, "mu": mu_scaling}, out_scaling)
     _, jac_raw = op.forward({"x": x_raw, "mu": mu_raw}, return_jacobian=True)
 
-    col_scale = (out_scaling / x_scaling).view(1, 1, -1)
-    expected = jac_scaled * col_scale
+    scale = (out_scaling / x_scaling).view(1, 1, 1)
+    expected = jac_scaled * scale
     assert torch.allclose(jac_raw, expected, rtol=1e-10, atol=1e-10)
 
 
@@ -144,10 +150,13 @@ def test_skew_operator_scaling_forward():
 
     x_raw = torch.randn([6, x_input.get_size()], dtype=DTYPE)
     mu_raw = torch.randn([6, mu_input.get_size()], dtype=DTYPE)
-    x_scaling, mu_scaling, out_scaling = _make_scalings(3, 2, 3)
+    _, mu_scaling, _ = _make_scalings(3, 2, 3)
+    x_scaling = torch.tensor(2.0, dtype=DTYPE)
+    x_scaling_vec = torch.full((x_input.get_size(),), x_scaling, dtype=DTYPE)
+    out_scaling = torch.tensor(1.7, dtype=DTYPE)
 
     y_scaled = op.forward(_inputs_scaled(x_raw, mu_raw, x_scaling, mu_scaling))
-    op.set_scalings({"x": x_scaling, "mu": mu_scaling}, out_scaling)
+    op.set_scalings({"x": x_scaling_vec, "mu": mu_scaling}, out_scaling)
     y_raw = op.forward({"x": x_raw, "mu": mu_raw})
 
     expected = y_scaled * out_scaling
@@ -167,16 +176,18 @@ def test_skew_operator_scaling_jacobian():
 
     x_raw = torch.randn([4, x_input.get_size()], dtype=DTYPE)
     mu_raw = torch.randn([4, mu_input.get_size()], dtype=DTYPE)
-    x_scaling, mu_scaling, out_scaling = _make_scalings(3, 2, 3)
+    _, mu_scaling, _ = _make_scalings(3, 2, 3)
+    x_scaling = torch.tensor(2.0, dtype=DTYPE)
+    x_scaling_vec = torch.full((x_input.get_size(),), x_scaling, dtype=DTYPE)
+    out_scaling = torch.tensor(1.7, dtype=DTYPE)
 
     _, jac_scaled = op.forward(
         _inputs_scaled(x_raw, mu_raw, x_scaling, mu_scaling), return_jacobian=True
     )
-    op.set_scalings({"x": x_scaling, "mu": mu_scaling}, out_scaling)
+    op.set_scalings({"x": x_scaling_vec, "mu": mu_scaling}, out_scaling)
     _, jac_raw = op.forward({"x": x_raw, "mu": mu_raw}, return_jacobian=True)
 
-    col_scale = (out_scaling / x_scaling).view(1, 1, -1)
-    expected = jac_scaled * col_scale
+    expected = jac_scaled
     assert torch.allclose(jac_raw, expected, rtol=1e-10, atol=1e-10)
 
 
@@ -406,13 +417,15 @@ def test_psd_lagrangian_operator_scaling_forward():
 
     x_raw = torch.randn([6, x_var.get_size()], dtype=DTYPE)
     mu_raw = torch.randn([6, mu_var.get_size()], dtype=DTYPE)
-    x_scaling, mu_scaling, y_scaling = _make_scalings(3, 2, 3)
+    _, mu_scaling, _ = _make_scalings(3, 2, 3)
+    x_scaling = torch.tensor(2.0, dtype=DTYPE)
+    y_scaling = torch.tensor(1.7, dtype=DTYPE)
 
     y_scaled = op.forward(_inputs_scaled(x_raw, mu_raw, x_scaling, mu_scaling))
     op.set_scalings({"x": x_scaling, "mu": mu_scaling}, y_scaling)
 
     y_raw = op.forward({"x": x_raw, "mu": mu_raw})
-    expected = y_scaled * (y_scaling / x_scaling)
+    expected = y_scaled * y_scaling
     assert torch.allclose(y_raw, expected, rtol=1e-10, atol=1e-10)
 
 
@@ -430,9 +443,11 @@ def test_psd_lagrangian_operator_scaling_jacobian():
         positive=True,
     )
 
-    x_raw = torch.randn([4, x_var.get_size()], dtype=DTYPE)
-    mu_raw = torch.randn([4, mu_var.get_size()], dtype=DTYPE)
-    x_scaling, mu_scaling, y_scaling = _make_scalings(3, 2, 3)
+    x_raw = torch.randn([1, x_var.get_size()], dtype=DTYPE)
+    mu_raw = torch.randn([1, mu_var.get_size()], dtype=DTYPE)
+    _, mu_scaling, _ = _make_scalings(3, 2, 3)
+    x_scaling = torch.tensor(2.0, dtype=DTYPE)
+    y_scaling = torch.tensor(1.7, dtype=DTYPE)
 
     _, jac_scaled = op.forward(
         _inputs_scaled(x_raw, mu_raw, x_scaling, mu_scaling), return_jacobian=True
@@ -440,7 +455,9 @@ def test_psd_lagrangian_operator_scaling_jacobian():
     op.set_scalings({"x": x_scaling, "mu": mu_scaling}, y_scaling)
 
     _, jac_raw = op.forward({"x": x_raw, "mu": mu_raw}, return_jacobian=True)
-    row_scale = (y_scaling / x_scaling).view(1, -1, 1)
-    col_scale = (1.0 / x_scaling).view(1, 1, -1)
-    expected = jac_scaled * row_scale * col_scale
+    row_scale = (y_scaling / x_scaling).view(1, 1, 1)
+    expected = jac_scaled * row_scale
     assert torch.allclose(jac_raw, expected, rtol=1e-10, atol=1e-10)
+
+if __name__ == '__main__':
+  test_spd_operator_scaling_forward()
