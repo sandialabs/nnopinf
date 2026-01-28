@@ -66,6 +66,27 @@ settings["batch-size"] = 50
 nnopinf.training.train(model, variables=[x_var], y=y_var, training_settings=settings)
 ```
 
+## Quadratic operator example
+
+```python
+import numpy as np
+import nnopinf
+import nnopinf.operators as operators
+import nnopinf.models as models
+
+state_dim = 3
+x = np.random.randn(10, state_dim)
+
+x_var = nnopinf.Variable(size=state_dim, name="x")
+x_var.set_data(x)
+
+quad_op = operators.QuadraticOperator(n_outputs=state_dim, acts_on=x_var)
+model = models.Model([quad_op])
+
+inputs = {"x": x_var.data_}
+y = model.forward(inputs)
+```
+
 ## Repository layout
 
 - `nnopinf/`: core library (operators, models, variables, steppers, training)

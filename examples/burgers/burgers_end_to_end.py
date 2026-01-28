@@ -115,7 +115,7 @@ if __name__=='__main__':
     # Make POD basis
     Phi,s,_ = np.linalg.svd(u,full_matrices=False)
     relative_energy = np.cumsum(s**2) / np.sum(s**2)
-    K = np.argmin(np.abs(relative_energy - 0.99999999))
+    K = 10#np.argmin(np.abs(relative_energy - 0.99999999))
     Phi = Phi[:,0:K]
   
     #Now do nnopinf
@@ -145,8 +145,13 @@ if __name__=='__main__':
     training_settings = nnopinf.training.get_default_settings()
     training_settings['batch-size'] = 500
     training_settings['num-epochs'] = 10000
+    training_settings['GN-final-layer'] = True 
+    training_settings['GN-num-layers'] = 1
+    training_settings['LBFGS-acceleration'] = False 
+    training_settings['GN-final-layer-damping'] = 0
+    training_settings['GN-final-layer-epoch-frequency'] = 25
     print("Settings are: ",training_settings)
-
+    
     x_input.set_data(uhat.transpose())
     target.set_data(uhat_dot.transpose())
 

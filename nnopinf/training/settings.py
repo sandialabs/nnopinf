@@ -5,7 +5,7 @@ def get_default_settings(optimizer='ADAM'):
       'output-path': 'ml-models/',
       'optimizer': 'ADAM',
       'LBFGS-acceleration': True,
-      'LBFGS-acceleration-epoch-frequency' : 2e9,
+      'LBFGS-acceleration-epoch-frequency' : 1000,
       'LBFGS-acceleration-iterations' : 50,
       'num-epochs': 10000,
       'batch-size': 50,
