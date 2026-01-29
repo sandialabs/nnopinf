@@ -24,9 +24,10 @@ which enforces semi-positive-definiteness.
    nnopinf.operators.SpdOperator
    nnopinf.operators.SkewOperator
    nnopinf.operators.MatrixOperator
+   nnopinf.operators.StandardLagrangianOperator
+   nnopinf.operators.PsdLagrangianOperator
    nnopinf.operators.CompositeOperator
    nnopinf.operators.LinearAffineTensorOperator
    nnopinf.operators.LinearAffineSkewTensorOperator
    nnopinf.operators.LinearAffineSpdTensorOperator
    nnopinf.operators.VectorOffsetOperator
-
