@@ -65,3 +65,35 @@ Tips
 - The script uses a long training horizon. For a quick smoke test, lower
   ``num-epochs`` and increase ``batch-size`` near the top of the script.
 - Output PDFs are written in the example directory.
+
+Transient heat diffusion example
+--------------------------------
+
+This example solves transient heat diffusion on the unit square with zero
+Dirichlet boundaries and constant forcing, builds a POD-reduced state, and
+trains a **linear** structure-preserving NN-OpInf model with:
+
+- ``LinearAffineSpdTensorOperator(acts_on=x, depends_on=(), positive=False)``
+  for dissipative diffusion dynamics
+- ``VectorOffsetOperator`` for the constant forcing term
+
+Training uses ADAM with LBFGS acceleration:
+(``training_settings["optimizer"] = "ADAM"``,
+``training_settings["LBFGS-acceleration"] = True``).
+
+Run it:
+
+.. code-block:: bash
+
+   python examples/diffusion/heat_diffusion_end_to_end.py --kappa 0.75 --forcing 1.0
+
+Key outputs:
+
+- Plot: ``examples/diffusion/heat_diffusion_solution.pdf``
+- Trained models: ``examples/diffusion/ml-models/``
+
+Code
+----
+
+.. literalinclude:: ../../examples/diffusion/heat_diffusion_end_to_end.py
+   :language: python

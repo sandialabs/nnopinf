@@ -459,5 +459,88 @@ def test_psd_lagrangian_operator_scaling_jacobian():
     expected = jac_scaled * row_scale
     assert torch.allclose(jac_raw, expected, rtol=1e-10, atol=1e-10)
 
+
+# ---------------------------------
+# Linear affine operator empty tests
+# ---------------------------------
+
+def test_linear_affine_tensor_operator_empty_depends_on():
+    _set_seed(20)
+    x_var = Variable(size=3, name="x")
+    op = nnopinf.operators.LinearAffineTensorOperator(
+        n_outputs=3,
+        acts_on=x_var,
+        depends_on=(),
+    )
+
+    x = torch.randn([6, x_var.get_size()], dtype=DTYPE)
+    y, jac = op.forward({"x": x}, return_jacobian=True)
+
+    assert y.shape == (6, 3)
+    assert jac.shape == (6, 3, 3)
+    assert torch.allclose(y, torch.einsum("bij,bj->bi", jac, x), rtol=1e-12, atol=1e-12)
+
+    op.set_scalings(
+        {"x": torch.tensor([1.4, 1.8, 2.2], dtype=DTYPE)},
+        torch.tensor([1.1, 1.3, 1.7], dtype=DTYPE),
+    )
+    y_scaled = op.forward({"x": x})
+    assert y_scaled.shape == y.shape
+
+
+def test_linear_affine_skew_tensor_operator_empty_depends_on():
+    _set_seed(21)
+    x_var = Variable(size=4, name="x")
+    op = nnopinf.operators.LinearAffineSkewTensorOperator(
+        acts_on=x_var,
+        depends_on=(),
+        skew=True,
+    )
+
+    x = torch.randn([5, x_var.get_size()], dtype=DTYPE)
+    y = op.forward({"x": x})
+
+    assert y.shape == x.shape
+    # For skew-symmetric operators, x^T A x = 0.
+    energy = torch.sum(x * y, dim=1)
+    assert torch.allclose(energy, torch.zeros_like(energy), rtol=1e-10, atol=1e-10)
+
+    op.set_scalings(
+        {"x": torch.tensor([1.2, 1.4, 1.6, 1.8], dtype=DTYPE)},
+        torch.tensor([1.1, 1.2, 1.3, 1.4], dtype=DTYPE),
+    )
+    y_scaled = op.forward({"x": x})
+    assert y_scaled.shape == y.shape
+
+
+def test_linear_affine_spd_tensor_operator_empty_depends_on_sign():
+    _set_seed(22)
+    x_var = Variable(size=3, name="x")
+    op_pos = nnopinf.operators.LinearAffineSpdTensorOperator(
+        acts_on=x_var,
+        depends_on=(),
+        positive=True,
+    )
+    _set_seed(22)
+    op_neg = nnopinf.operators.LinearAffineSpdTensorOperator(
+        acts_on=x_var,
+        depends_on=(),
+        positive=False,
+    )
+
+    x = torch.randn([7, x_var.get_size()], dtype=DTYPE)
+    y_pos = op_pos.forward({"x": x})
+    y_neg = op_neg.forward({"x": x})
+    assert torch.allclose(y_pos, -y_neg, rtol=1e-12, atol=1e-12)
+
+    x_scaling = torch.tensor([1.3, 1.7, 2.1], dtype=DTYPE)
+    y_scaling = torch.tensor([1.1, 1.4, 1.8], dtype=DTYPE)
+    op_pos.set_scalings({"x": x_scaling}, y_scaling)
+    op_neg.set_scalings({"x": x_scaling}, y_scaling)
+    y_pos_scaled = op_pos.forward({"x": x})
+    y_neg_scaled = op_neg.forward({"x": x})
+    assert torch.allclose(y_pos_scaled, -y_neg_scaled, rtol=1e-12, atol=1e-12)
+
+
 if __name__ == '__main__':
   test_spd_operator_scaling_forward()

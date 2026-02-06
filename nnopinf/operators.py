@@ -1538,10 +1538,12 @@ class LinearAffineTensorOperator(nn.Module):
         self.acts_on_name_ = acts_on.get_name()
         self.acts_on_size_ = acts_on.get_size()
         self.depends_on_names_ = []
-        self.n_inputs_ = 0
+        n_inputs_total = 0
         for i in range(len(depends_on)):
           self.depends_on_names_.append(depends_on[i].get_name())
-          self.n_inputs_ += depends_on[i].get_size()
+          n_inputs_total += depends_on[i].get_size()
+        self.has_affine_inputs_ = (n_inputs_total > 0)
+        self.n_inputs_ = (n_inputs_total if self.has_affine_inputs_ else 1)
         # Learnable tensor -- unstructured
         self.T = nn.Parameter(torch.randn([n_outputs,self.acts_on_size_,self.n_inputs_]))
         self.name_ = name
@@ -1563,7 +1565,10 @@ class LinearAffineTensorOperator(nn.Module):
 
       # Separate out states and parameters
       x = inputs[self.acts_on_name_]
-      mu = inputs_to_tensor(inputs,self.depends_on_names_)
+      if self.has_affine_inputs_:
+        mu = inputs_to_tensor(inputs,self.depends_on_names_)
+      else:
+        mu = torch.ones((x.shape[0], 1), dtype=x.dtype, device=x.device)
       # Compute product (T*mu)x
       result = torch.einsum('ijp,bj,bp->bi',self.T,x,mu)
 
@@ -1577,12 +1582,15 @@ class LinearAffineTensorOperator(nn.Module):
     def set_scalings(self,input_scalings_dict,output_scaling):
      with torch.no_grad():
       self.scalings_set_ = True
-      input_scalings = None
-      for input_arg in self.depends_on_names_:
-        if input_scalings is None:
-          input_scalings = input_scalings_dict[input_arg]
-        else:
-          input_scalings = torch.cat( (input_scalings,input_scalings_dict[input_arg]),0)
+      if self.has_affine_inputs_:
+        input_scalings = None
+        for input_arg in self.depends_on_names_:
+          if input_scalings is None:
+            input_scalings = input_scalings_dict[input_arg]
+          else:
+            input_scalings = torch.cat( (input_scalings,input_scalings_dict[input_arg]),0)
+      else:
+        input_scalings = torch.ones_like(self.T[0, 0, :])
       
       #for i in range(0,self.T.shape[-1]):
       self.input_scalings_ = input_scalings
@@ -1627,10 +1635,12 @@ class LinearAffineSkewTensorOperator(nn.Module):
         self.n_outputs_ = self.acts_on_size_ 
 
         self.depends_on_names_ = []
-        self.n_inputs_ = 0
+        n_inputs_total = 0
         for i in range(len(depends_on)):
           self.depends_on_names_.append(depends_on[i].get_name())
-          self.n_inputs_ += depends_on[i].get_size()
+          n_inputs_total += depends_on[i].get_size()
+        self.has_affine_inputs_ = (n_inputs_total > 0)
+        self.n_inputs_ = (n_inputs_total if self.has_affine_inputs_ else 1)
 
         # set dims and indices based on skew or sym
         if not skew: 
@@ -1667,7 +1677,10 @@ class LinearAffineSkewTensorOperator(nn.Module):
       assert return_jacobian == False, "Return jacobian currently not implemented for linear skew operator"
       # Separate out states and parameters
       x = inputs[self.acts_on_name_]
-      mu = inputs_to_tensor(inputs,self.depends_on_names_)
+      if self.has_affine_inputs_:
+        mu = inputs_to_tensor(inputs,self.depends_on_names_)
+      else:
+        mu = torch.ones((x.shape[0], 1), dtype=x.dtype, device=x.device)
       mu = mu / self.input_scalings_
       # Fill tensor with learnable parameters
       S  = torch.zeros(self.n_outputs_,self.n_outputs_,self.n_inputs_)
@@ -1685,12 +1698,15 @@ class LinearAffineSkewTensorOperator(nn.Module):
     def set_scalings(self,input_scalings_dict,output_scaling):
      with torch.no_grad():
       self.scalings_set_ = True
-      input_scalings = None
-      for input_arg in self.depends_on_names_:
-        if input_scalings is None:
-          input_scalings = input_scalings_dict[input_arg]
-        else:
-          input_scalings = torch.cat( (input_scalings,input_scalings_dict[input_arg]),0)
+      if self.has_affine_inputs_:
+        input_scalings = None
+        for input_arg in self.depends_on_names_:
+          if input_scalings is None:
+            input_scalings = input_scalings_dict[input_arg]
+          else:
+            input_scalings = torch.cat( (input_scalings,input_scalings_dict[input_arg]),0)
+      else:
+        input_scalings = torch.ones_like(self.input_scalings_)
       # Update initial layer weights
       self.input_scalings_[:] = input_scalings
       self.output_scalings_[:] = output_scaling
@@ -1727,10 +1743,12 @@ class LinearAffineSpdTensorOperator(nn.Module):
         self.n_outputs_ = self.acts_on_size_ 
 
         self.depends_on_names_ = []
-        self.n_inputs_ = 0
+        n_inputs_total = 0
         for i in range(len(depends_on)):
           self.depends_on_names_.append(depends_on[i].get_name())
-          self.n_inputs_ += depends_on[i].get_size()
+          n_inputs_total += depends_on[i].get_size()
+        self.has_affine_inputs_ = (n_inputs_total > 0)
+        self.n_inputs_ = (n_inputs_total if self.has_affine_inputs_ else 1)
 
         # set dims and indices
         ldim      = int(self.n_outputs_*(self.n_outputs_-1)/2)
@@ -1766,7 +1784,10 @@ class LinearAffineSpdTensorOperator(nn.Module):
 
       # Separate out states and parameters
       x = inputs[self.acts_on_name_]
-      mu = inputs_to_tensor(inputs,self.depends_on_names_)
+      if self.has_affine_inputs_:
+        mu = inputs_to_tensor(inputs,self.depends_on_names_)
+      else:
+        mu = torch.ones((x.shape[0], 1), dtype=x.dtype, device=x.device)
       mu = mu / self.input_scalings_
 
       # Fill tensor with learnable parameters
@@ -1787,12 +1808,15 @@ class LinearAffineSpdTensorOperator(nn.Module):
     def set_scalings(self,input_scalings_dict,output_scaling):
      with torch.no_grad():
       self.scalings_set_ = True
-      input_scalings = None
-      for input_arg in self.depends_on_names_:
-        if input_scalings is None:
-          input_scalings = input_scalings_dict[input_arg]
-        else:
-          input_scalings = torch.cat( (input_scalings,input_scalings_dict[input_arg]),0)
+      if self.has_affine_inputs_:
+        input_scalings = None
+        for input_arg in self.depends_on_names_:
+          if input_scalings is None:
+            input_scalings = input_scalings_dict[input_arg]
+          else:
+            input_scalings = torch.cat( (input_scalings,input_scalings_dict[input_arg]),0)
+      else:
+        input_scalings = torch.ones_like(self.input_scalings_)
       # Update initial layer weights
       self.input_scalings_[:] = input_scalings
       self.output_scalings_[:] = output_scaling
