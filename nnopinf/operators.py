@@ -992,6 +992,7 @@ class MatrixOperator(nn.Module):
         self.scalings_set_ = False
         self.scaling_mat_ = torch.eye(self.n_outputs_)
         self.scaling_mat2_ = torch.eye(self.n_outputs_)
+        self.scaling_inputs_ = np.ones(self.acts_on_size_) 
 
         self.scalings_set_ = False
 
@@ -1040,9 +1041,11 @@ class MatrixOperator(nn.Module):
           y = act(self.forward_list[i](y))
       y = self.forward_list[-1](y)
       A = torch.reshape(y,(y.shape[0],self.n_outputs_,self.acts_on_size_))
-      A = torch.einsum('ij,njk->nik',self.scaling_mat2_,A)
+      A = torch.einsum('ij,njk->nik',self.scaling_mat_,A)
       state = inputs[self.acts_on_name_] 
-      state = torch.einsum('ij,nj->ni',self.scaling_mat_ , state)
+      #print(self.scaling_mat_.shape,state.shape)
+      state = state * self.scaling_inputs_[None] 
+      #state = torch.einsum('ij,nj->ni',self.scaling_mat_ , state)
       result = torch.einsum('ijk,ik->ij',A,state)
       if return_jacobian:
           return result[:,:],A
@@ -1071,7 +1074,8 @@ class MatrixOperator(nn.Module):
       #final_layer.weight[:] =  ( torch.eye(self.n_outputs_) / input_scalings_dict[self.acts_on_name_] ) @ final_layer.weight[:] 
       #final_layer.bias[:] =  ( torch.eye(self.n_outputs_) / input_scalings_dict[self.acts_on_name_]).flatten() * final_layer.bias[:]
       self.scaling_mat_[:] = torch.eye(self.n_outputs_) *  output_scaling
-      self.scaling_mat2_ = torch.eye(self.n_outputs_) /  input_scalings_dict[self.acts_on_name_]
+      #self.scaling_mat2_ = torch.eye(self.n_outputs_) /  input_scalings_dict[self.acts_on_name_]
+      self.scaling_inputs_ = 1./ input_scalings_dict[self.acts_on_name_]
 
 
 class QuadraticOperator(nn.Module):
