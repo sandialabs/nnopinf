@@ -32,8 +32,8 @@ v0.1.0</title>
 
     <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=a746c00c" />
     <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=949a1ff5" />
-    <link rel="stylesheet" type="text/css" href="../../_static/mystnb.4510f1fc1dee50b3e5859aac5469c37c29e427902b24a333a5f9fcb2f0b3ac41.css" />
-    <link rel="stylesheet" type="text/css" href="../../_static/jupyter-sphinx.css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/jupyter-sphinx.css?v=572af1d6" />
     <link rel="stylesheet" type="text/css" href="../../_static/thebelab.css" />
     <link rel="stylesheet" type="text/css" href="../../_static/custom.css" />
     <link rel="stylesheet" type="text/css" href="../../_static/sphinx-design.min.css?v=87e54e7c" />
@@ -59,7 +59,7 @@ v0.1.0</title>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
   <meta name="docsearch:version" content="" />
-    <meta name="docbuild:last-update" content="Dec 03, 2025"/>
+    <meta name="docbuild:last-update" content="Mar 19, 2026"/>
   </head>
   
   
@@ -144,8 +144,22 @@ v0.1.0 - Home"/>
   <ul class="bd-navbar-elements navbar-nav">
     
 <li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../getting_started.html">
+    Getting Started
+  </a>
+</li>
+
+
+<li class="nav-item ">
   <a class="nav-link nav-internal" href="../../api.html">
     API
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../examples.html">
+    Examples
   </a>
 </li>
 
@@ -209,8 +223,22 @@ v0.1.0 - Home"/>
   <ul class="bd-navbar-elements navbar-nav">
     
 <li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../getting_started.html">
+    Getting Started
+  </a>
+</li>
+
+
+<li class="nav-item ">
   <a class="nav-link nav-internal" href="../../api.html">
     API
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../examples.html">
+    Examples
   </a>
 </li>
 
@@ -285,15 +313,12 @@ v0.1.0 - Home"/>
 <span class="n">torch</span><span class="o">.</span><span class="n">set_default_dtype</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
 
 <span class="k">def</span> <span class="nf">inputs_to_tensor</span><span class="p">(</span><span class="n">inputs</span><span class="p">,</span><span class="n">names_to_collect</span><span class="p">):</span>
-    <span class="n">operator_inputs</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">operator_inputs</span> <span class="o">=</span> <span class="p">[]</span>
     <span class="k">for</span> <span class="n">input_name</span> <span class="ow">in</span> <span class="n">names_to_collect</span><span class="p">:</span>
-      <span class="k">if</span> <span class="n">operator_inputs</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="n">operator_inputs</span> <span class="o">=</span> <span class="n">inputs</span><span class="p">[</span><span class="n">input_name</span><span class="p">]</span>
-      <span class="k">else</span><span class="p">:</span>
-        <span class="n">operator_inputs</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">(</span> <span class="p">(</span><span class="n">operator_inputs</span><span class="p">,</span><span class="n">inputs</span><span class="p">[</span><span class="n">input_name</span><span class="p">]),</span><span class="mi">1</span><span class="p">)</span>
-    <span class="k">if</span> <span class="n">operator_inputs</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-      <span class="n">operator_inputs</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">))</span>
-    <span class="k">return</span> <span class="n">operator_inputs</span> 
+      <span class="n">operator_inputs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">inputs</span><span class="p">[</span><span class="n">input_name</span><span class="p">])</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">operator_inputs</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+      <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">(</span><span class="n">operator_inputs</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
 
 <span class="k">def</span> <span class="nf">create_layers</span><span class="p">(</span><span class="n">input_size</span><span class="p">,</span><span class="n">output_size</span><span class="p">,</span><span class="n">n_hidden_layers</span><span class="p">,</span><span class="n">n_neurons_per_layer</span><span class="p">):</span>
       <span class="n">dim</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">n_hidden_layers</span><span class="o">+</span><span class="mi">2</span><span class="p">,</span><span class="n">dtype</span><span class="o">=</span><span class="s1">&#39;int&#39;</span><span class="p">)</span>
@@ -319,7 +344,7 @@ v0.1.0 - Home"/>
 
 <div class="viewcode-block" id="Operator.forward">
 <a class="viewcode-back" href="../../generated/classes/nnopinf.operators.Operator.html#nnopinf.operators.Operator.forward">[docs]</a>
-    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">inputs</span><span class="p">,</span><span class="n">return_jacobian</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">inputs</span><span class="p">,</span><span class="n">return_jacobian</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
 <span class="w">      </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">      Forward pass of operator </span>
 
@@ -328,8 +353,8 @@ v0.1.0 - Home"/>
 <span class="sd">      inputs : dict(str, np.array) </span>
 <span class="sd">          Dictionary of input data in the form of arrays referenced by the variable name, i.e., inputs[&#39;x&#39;] = np.ones(3)</span>
 <span class="sd">  </span>
-<span class="sd">      return_jacobian: bool </span>
-<span class="sd">          If the method returns the (approximate) Jacobian, A. </span>
+<span class="sd">      return_jacobian: bool, optional</span>
+<span class="sd">          If True, return the (approximate) Jacobian in addition to the output.</span>
 <span class="sd">      &quot;&quot;&quot;</span> </div>
 
 
@@ -419,7 +444,7 @@ v0.1.0 - Home"/>
 
 <div class="viewcode-block" id="VectorOffsetOperator.forward">
 <a class="viewcode-back" href="../../generated/classes/nnopinf.operators.VectorOffsetOperator.html#nnopinf.operators.VectorOffsetOperator.forward">[docs]</a>
-    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">inputs</span><span class="p">,</span><span class="n">return_jacobian</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">inputs</span><span class="p">,</span><span class="n">return_jacobian</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
 <span class="w">      </span><span class="sd">&quot;&quot;&quot; </span>
 <span class="sd">      Forward pass of operator </span>
 
@@ -428,8 +453,8 @@ v0.1.0 - Home"/>
 <span class="sd">      inputs : dict(str, np.array) </span>
 <span class="sd">          Dictionary of input data in the form of arrays referenced by the variable name, i.e., inputs[&#39;x&#39;] = np.ones(3)</span>
 <span class="sd">  </span>
-<span class="sd">      return_jacobian: bool </span>
-<span class="sd">          If the method returns the (approximate) Jacobian, A. </span>
+<span class="sd">      return_jacobian: bool, optional</span>
+<span class="sd">          If True, return the (approximate) Jacobian in addition to the output.</span>
 <span class="sd">  </span>
 <span class="sd">      &quot;&quot;&quot;</span>
       <span class="k">if</span> <span class="n">return_jacobian</span><span class="p">:</span> 
@@ -474,7 +499,7 @@ v0.1.0 - Home"/>
 <span class="sd">        Number of nuerons in each hidden layer</span>
 
 <span class="sd">    activation : PyTorch activation function (e.g., torch.nn.functional.relu)</span>
-<span class="sd">        Activation function used at each layer</span>
+<span class="sd">        Activation function used at each hidden layer.</span>
 <span class="sd"> </span>
 <span class="sd">    name : string </span>
 <span class="sd">        Operator name. Used when saving to file </span>
@@ -488,7 +513,7 @@ v0.1.0 - Home"/>
 <span class="sd">    &gt;&gt;&gt; StandardMlp = nnopinf.operators.StandardOperator(n_outputs=5,depends_on=(x_input,mu_input,),n_hidden_layers=2,n_neurons_per_layer=2)</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">n_outputs</span><span class="p">,</span><span class="n">depends_on</span><span class="p">,</span><span class="n">n_hidden_layers</span><span class="p">,</span><span class="n">n_neurons_per_layer</span><span class="p">,</span><span class="n">activation</span><span class="o">=</span><span class="n">F</span><span class="o">.</span><span class="n">relu</span><span class="p">,</span><span class="n">name</span><span class="o">=</span><span class="s1">&#39;StandardOperator&#39;</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">n_outputs</span><span class="p">,</span><span class="n">depends_on</span><span class="p">,</span><span class="n">n_hidden_layers</span><span class="p">,</span><span class="n">n_neurons_per_layer</span><span class="p">,</span><span class="n">activation</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">tanh</span><span class="p">,</span><span class="n">name</span><span class="o">=</span><span class="s1">&#39;StandardOperator&#39;</span><span class="p">):</span>
         <span class="nb">super</span><span class="p">(</span><span class="n">StandardOperator</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">name_</span> <span class="o">=</span> <span class="n">name</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">n_outputs_</span> <span class="o">=</span> <span class="n">n_outputs</span> 
@@ -500,31 +525,31 @@ v0.1.0 - Home"/>
         <span class="bp">self</span><span class="o">.</span><span class="n">num_hidden_layers</span> <span class="o">=</span> <span class="n">n_hidden_layers</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">num_layers</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_hidden_layers</span> <span class="o">+</span> <span class="mi">1</span>
 
-        <span class="n">n_inputs</span> <span class="o">=</span> <span class="mi">0</span>
-        <span class="k">for</span> <span class="n">operator_input</span> <span class="ow">in</span> <span class="n">depends_on</span><span class="p">:</span>
-          <span class="n">n_inputs</span> <span class="o">+=</span> <span class="n">operator_input</span><span class="o">.</span><span class="n">get_size</span><span class="p">()</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">n_inputs_</span> <span class="o">=</span> <span class="n">n_inputs</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">forward_list</span> <span class="o">=</span> <span class="n">create_layers</span><span class="p">(</span><span class="n">n_inputs</span><span class="p">,</span><span class="n">network_output_size</span><span class="p">,</span><span class="n">n_hidden_layers</span><span class="p">,</span><span class="n">n_neurons_per_layer</span><span class="p">)</span>
-
+        <span class="bp">self</span><span class="o">.</span><span class="n">n_inputs_</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">var</span><span class="o">.</span><span class="n">get_size</span><span class="p">()</span> <span class="k">for</span> <span class="n">var</span> <span class="ow">in</span> <span class="n">depends_on</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">forward_list</span> <span class="o">=</span> <span class="n">create_layers</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n_inputs_</span><span class="p">,</span><span class="n">network_output_size</span><span class="p">,</span><span class="n">n_hidden_layers</span><span class="p">,</span><span class="n">n_neurons_per_layer</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">activation</span> <span class="o">=</span> <span class="n">activation</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">input_scaling_</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">n_inputs</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">scalings_set_</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">input_scaling_</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n_inputs_</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">output_scaling_</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">n_outputs</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_net</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">y</span><span class="p">):</span>
+      <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">num_layers</span><span class="o">-</span><span class="mi">1</span><span class="p">):</span>
+        <span class="n">y</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">activation</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">forward_list</span><span class="p">[</span><span class="n">i</span><span class="p">](</span><span class="n">y</span><span class="p">))</span>
+      <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">forward_list</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">](</span><span class="n">y</span><span class="p">)</span>
 
 <div class="viewcode-block" id="StandardOperator.forward">
 <a class="viewcode-back" href="../../generated/classes/nnopinf.operators.StandardOperator.html#nnopinf.operators.StandardOperator.forward">[docs]</a>
     <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">inputs</span><span class="p">,</span><span class="n">return_jacobian</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
 <span class="w">      </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">      Forward pass of operator </span>
-
-<span class="sd">      .. warning:: return_jacobian is currently not implemented </span>
 <span class="sd">  </span>
 <span class="sd">      Parameters</span>
 <span class="sd">      ----------</span>
 <span class="sd">      inputs : dict(str, np.array) </span>
 <span class="sd">          Dictionary of input data in the form of arrays referenced by the variable name, i.e., inputs[&#39;x&#39;] = np.ones(3)</span>
 <span class="sd">  </span>
-<span class="sd">      return_jacobian: bool </span>
-<span class="sd">          If the method returns the (approximate) Jacobian, A. </span>
+<span class="sd">      return_jacobian: bool, optional</span>
+<span class="sd">          If True, return the (approximate) Jacobian in addition to the output.</span>
 <span class="sd">  </span>
 <span class="sd">      Examples</span>
 <span class="sd">      --------</span>
@@ -537,17 +562,25 @@ v0.1.0 - Home"/>
 <span class="sd">      &gt;&gt;&gt; inputs = {}</span>
 <span class="sd">      &gt;&gt;&gt; inputs[&#39;x&#39;] = np.random.normal(3)</span>
 <span class="sd">      &gt;&gt;&gt; inputs[&#39;mu&#39;] = np.random.normal(2)</span>
-<span class="sd">      &gt;&gt;&gt; f = MatrixMlp.forward(inputs)</span>
+<span class="sd">      &gt;&gt;&gt; f = StandardMlp.forward(inputs)</span>
 <span class="sd">      &quot;&quot;&quot;</span>
 
-      <span class="k">if</span> <span class="n">return_jacobian</span> <span class="o">==</span> <span class="kc">True</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Error, return_jacobian not implemented for StandardOperator&quot;</span><span class="p">)</span>
-      <span class="k">else</span><span class="p">:</span> 
-        <span class="n">y</span> <span class="o">=</span> <span class="n">inputs_to_tensor</span><span class="p">(</span><span class="n">inputs</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">depends_on_names_</span><span class="p">)</span> 
-        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">num_layers</span><span class="o">-</span><span class="mi">1</span><span class="p">):</span>
-          <span class="n">y</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">activation</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">forward_list</span><span class="p">[</span><span class="n">i</span><span class="p">](</span><span class="n">y</span><span class="p">))</span>
-        <span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">forward_list</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">](</span><span class="n">y</span><span class="p">)</span>
-      <span class="k">return</span> <span class="n">result</span><span class="p">[:,:]</span></div>
+      <span class="n">y</span> <span class="o">=</span> <span class="n">inputs_to_tensor</span><span class="p">(</span><span class="n">inputs</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">depends_on_names_</span><span class="p">)</span>
+      <span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_net</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
+      <span class="k">if</span> <span class="n">return_jacobian</span><span class="p">:</span>
+        <span class="n">jac_list</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]):</span>
+          <span class="n">yi</span> <span class="o">=</span> <span class="n">y</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">detach</span><span class="p">()</span><span class="o">.</span><span class="n">requires_grad_</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+
+          <span class="k">def</span> <span class="nf">scalar_fn</span><span class="p">(</span><span class="n">z</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_net</span><span class="p">(</span><span class="n">z</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">0</span><span class="p">))</span><span class="o">.</span><span class="n">squeeze</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+
+          <span class="n">jac</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">autograd</span><span class="o">.</span><span class="n">functional</span><span class="o">.</span><span class="n">jacobian</span><span class="p">(</span><span class="n">scalar_fn</span><span class="p">,</span> <span class="n">yi</span><span class="p">,</span> <span class="n">create_graph</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+          <span class="n">jac_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">jac</span><span class="p">)</span>
+        <span class="n">jacobian</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">stack</span><span class="p">(</span><span class="n">jac_list</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">result</span><span class="p">[:,:],</span> <span class="n">jacobian</span>
+      <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">result</span><span class="p">[:,:]</span></div>
 
 
 
@@ -567,7 +600,7 @@ v0.1.0 - Home"/>
        
       <span class="c1"># Update final layer weights</span>
       <span class="n">final_layer</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">forward_list</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
-      <span class="n">final_layer</span><span class="o">.</span><span class="n">weight</span><span class="p">[:]</span> <span class="o">=</span>  <span class="p">(</span><span class="n">output_scaling</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n_inputs_</span><span class="p">))</span> <span class="o">@</span> <span class="n">final_layer</span><span class="o">.</span><span class="n">weight</span><span class="p">[:]</span>
+      <span class="n">final_layer</span><span class="o">.</span><span class="n">weight</span><span class="p">[:]</span> <span class="o">=</span>  <span class="p">(</span><span class="n">output_scaling</span> <span class="o">*</span> <span class="n">torch</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n_outputs_</span><span class="p">))</span> <span class="o">@</span> <span class="n">final_layer</span><span class="o">.</span><span class="n">weight</span><span class="p">[:]</span>
       <span class="n">final_layer</span><span class="o">.</span><span class="n">bias</span><span class="p">[:]</span> <span class="o">=</span>  <span class="n">output_scaling</span> <span class="o">*</span> <span class="n">final_layer</span><span class="o">.</span><span class="n">bias</span><span class="p">[:]</span></div>
 
 
@@ -597,10 +630,18 @@ v0.1.0 - Home"/>
 <span class="sd">        Number of nuerons in each hidden layer</span>
 
 <span class="sd">    activation : PyTorch activation function (e.g., torch.nn.functional.relu)</span>
-<span class="sd">        Activation function used at each layer</span>
-<span class="sd"> </span>
+<span class="sd">        Activation function used at each hidden layer.</span>
+
 <span class="sd">    positive : bool </span>
 <span class="sd">        If operator is SPD or NPD </span>
+
+<span class="sd">    parameterization : str</span>
+<span class="sd">        SPD parameterization. Supported values are ``&quot;cholesky&quot;`` (default, uses</span>
+<span class="sd">        :math:`L L^T`) and ``&quot;matrix_exp&quot;`` (uses :math:`\\exp(S)` with symmetric</span>
+<span class="sd">        :math:`S`).</span>
+
+<span class="sd">    layer_norm : bool</span>
+<span class="sd">        If True, apply LayerNorm after each hidden linear layer.</span>
 
 <span class="sd">    name : string </span>
 <span class="sd">        Operator name. Used when saving to file </span>
@@ -614,7 +655,18 @@ v0.1.0 - Home"/>
 <span class="sd">    &gt;&gt;&gt; NpdMlp = nnopinf.operators.SpdOperator(acts_on=x_input,depends_on=(x_input,mu_input,),n_hidden_layers=2,n_neurons_per_layer=2,positive=False)</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">acts_on</span><span class="p">,</span><span class="n">depends_on</span><span class="p">,</span><span class="n">n_hidden_layers</span><span class="p">,</span><span class="n">n_neurons_per_layer</span><span class="p">,</span><span class="n">activation</span><span class="o">=</span><span class="n">F</span><span class="o">.</span><span class="n">relu</span><span class="p">,</span> <span class="n">positive</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span><span class="n">name</span><span class="o">=</span><span class="s1">&#39;SpdOperator&#39;</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">acts_on</span><span class="p">,</span>
+        <span class="n">depends_on</span><span class="p">,</span>
+        <span class="n">n_hidden_layers</span><span class="p">,</span>
+        <span class="n">n_neurons_per_layer</span><span class="p">,</span>
+        <span class="n">activation</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">tanh</span><span class="p">,</span>
+        <span class="n">positive</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">name</span><span class="o">=</span><span class="s1">&#39;SpdOperator&#39;</span><span class="p">,</span>
+        <span class="n">parameterization</span><span class="o">=</span><span class="s1">&#39;cholesky&#39;</span><span class="p">,</span>
+        <span class="n">layer_norm</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="p">):</span>
         <span class="nb">super</span><span class="p">(</span><span class="n">SpdOperator</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">name_</span> <span class="o">=</span> <span class="n">name</span>
         <span class="n">forward_list</span> <span class="o">=</span> <span class="p">[]</span>
@@ -629,22 +681,27 @@ v0.1.0 - Home"/>
 
         <span class="n">idx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">tril_indices</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n_outputs_</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">idx</span> <span class="o">=</span> <span class="n">idx</span>
+        <span class="k">if</span> <span class="n">parameterization</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s1">&#39;cholesky&#39;</span><span class="p">,</span> <span class="s1">&#39;matrix_exp&#39;</span><span class="p">):</span>
+          <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;parameterization must be &#39;cholesky&#39; or &#39;matrix_exp&#39;&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">parameterization_</span> <span class="o">=</span> <span class="n">parameterization</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">layer_norm_</span> <span class="o">=</span> <span class="n">layer_norm</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">scalings_set_</span> <span class="o">=</span> <span class="kc">False</span>
 
         <span class="n">network_output_size</span> <span class="o">=</span> <span class="n">idx</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">size</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">num_hidden_layers</span> <span class="o">=</span> <span class="n">n_hidden_layers</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">num_layers</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_hidden_layers</span> <span class="o">+</span> <span class="mi">1</span>
 
-        <span class="n">n_inputs</span> <span class="o">=</span> <span class="mi">0</span>
-        <span class="k">for</span> <span class="n">operator_input</span> <span class="ow">in</span> <span class="n">depends_on</span><span class="p">:</span>
-          <span class="n">n_inputs</span> <span class="o">+=</span> <span class="n">operator_input</span><span class="o">.</span><span class="n">get_size</span><span class="p">()</span>
-
-        <span class="bp">self</span><span class="o">.</span><span class="n">n_inputs_</span> <span class="o">=</span> <span class="n">n_inputs</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">n_inputs_</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">var</span><span class="o">.</span><span class="n">get_size</span><span class="p">()</span> <span class="k">for</span> <span class="n">var</span> <span class="ow">in</span> <span class="n">depends_on</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">positive_</span><span class="p">:</span>
           <span class="bp">self</span><span class="o">.</span><span class="n">scale_</span> <span class="o">=</span> <span class="mf">1.0</span>
         <span class="k">else</span><span class="p">:</span>
           <span class="bp">self</span><span class="o">.</span><span class="n">scale_</span> <span class="o">=</span> <span class="o">-</span><span class="mf">1.0</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">forward_list</span> <span class="o">=</span> <span class="n">create_layers</span><span class="p">(</span><span class="n">n_inputs</span><span class="p">,</span><span class="n">network_output_size</span><span class="p">,</span><span class="n">n_hidden_layers</span><span class="p">,</span><span class="n">n_neurons_per_layer</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">forward_list</span> <span class="o">=</span> <span class="n">create_layers</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n_inputs_</span><span class="p">,</span><span class="n">network_output_size</span><span class="p">,</span><span class="n">n_hidden_layers</span><span class="p">,</span><span class="n">n_neurons_per_layer</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">layer_norm_</span><span class="p">:</span>
+          <span class="bp">self</span><span class="o">.</span><span class="n">layer_norms_</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">ModuleList</span><span class="p">(</span>
+            <span class="p">[</span><span class="n">nn</span><span class="o">.</span><span class="n">LayerNorm</span><span class="p">(</span><span class="n">n_neurons_per_layer</span><span class="p">)</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">num_layers</span><span class="o">-</span><span class="mi">1</span><span class="p">)]</span>
+          <span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">activation</span> <span class="o">=</span> <span class="n">activation</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">scaling_mat_</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n_outputs_</span><span class="p">)</span>
 
@@ -659,8 +716,8 @@ v0.1.0 - Home"/>
 <span class="sd">      inputs : dict(str, np.array) </span>
 <span class="sd">          Dictionary of input data in the form of arrays referenced by the variable name, i.e., inputs[&#39;x&#39;] = np.ones(3)</span>
 <span class="sd">  </span>
-<span class="sd">      return_jacobian: bool </span>
-<span class="sd">          If the method returns the (approximate) Jacobian, A. </span>
+<span class="sd">      return_jacobian: bool, optional</span>
+<span class="sd">          If True, return the (approximate) Jacobian in addition to the output.</span>
 <span class="sd">  </span>
 <span class="sd">      Examples</span>
 <span class="sd">      --------</span>
@@ -678,19 +735,28 @@ v0.1.0 - Home"/>
 
       <span class="n">y</span> <span class="o">=</span> <span class="n">inputs_to_tensor</span><span class="p">(</span><span class="n">inputs</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">depends_on_names_</span><span class="p">)</span>
       <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">num_layers</span><span class="o">-</span><span class="mi">1</span><span class="p">):</span>
-        <span class="n">y</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">activation</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">forward_list</span><span class="p">[</span><span class="n">i</span><span class="p">](</span><span class="n">y</span><span class="p">))</span>
+        <span class="n">z</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">forward_list</span><span class="p">[</span><span class="n">i</span><span class="p">](</span><span class="n">y</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">layer_norm_</span><span class="p">:</span>
+          <span class="n">z</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">layer_norms_</span><span class="p">[</span><span class="n">i</span><span class="p">](</span><span class="n">z</span><span class="p">)</span>
+        <span class="n">y</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">activation</span><span class="p">(</span><span class="n">z</span><span class="p">)</span>
 
       <span class="n">y</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">forward_list</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">](</span><span class="n">y</span><span class="p">)</span>
       <span class="n">K</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">y</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span><span class="bp">self</span><span class="o">.</span><span class="n">n_outputs_</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">n_outputs_</span><span class="p">)</span>
       <span class="n">K</span><span class="p">[:,</span><span class="bp">self</span><span class="o">.</span><span class="n">idx</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span><span class="bp">self</span><span class="o">.</span><span class="n">idx</span><span class="p">[</span><span class="mi">1</span><span class="p">]]</span> <span class="o">=</span> <span class="n">y</span><span class="p">[:,</span><span class="mi">0</span><span class="p">:</span><span class="bp">self</span><span class="o">.</span><span class="n">idx</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">size</span><span class="p">]</span>
-      <span class="n">KT</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="n">K</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">1</span><span class="p">)</span>
-      <span class="n">K</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">einsum</span><span class="p">(</span><span class="s1">&#39;ijk,ikl-&gt;ijl&#39;</span><span class="p">,</span><span class="n">K</span><span class="p">,</span><span class="n">KT</span><span class="p">)</span>
+      <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">parameterization_</span> <span class="o">==</span> <span class="s1">&#39;matrix_exp&#39;</span><span class="p">:</span>
+        <span class="n">KT</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="n">K</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">K</span> <span class="o">=</span> <span class="n">K</span> <span class="o">+</span> <span class="n">KT</span> <span class="o">-</span> <span class="n">torch</span><span class="o">.</span><span class="n">diag_embed</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">diagonal</span><span class="p">(</span><span class="n">K</span><span class="p">,</span> <span class="n">dim1</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">dim2</span><span class="o">=</span><span class="mi">2</span><span class="p">))</span>
+        <span class="n">K</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">matrix_exp</span><span class="p">(</span><span class="n">K</span><span class="p">)</span>
+      <span class="k">else</span><span class="p">:</span>
+        <span class="n">KT</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="n">K</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">K</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">einsum</span><span class="p">(</span><span class="s1">&#39;ijk,ikl-&gt;ijl&#39;</span><span class="p">,</span><span class="n">K</span><span class="p">,</span><span class="n">KT</span><span class="p">)</span>
       <span class="n">state</span> <span class="o">=</span> <span class="n">inputs</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">acts_on_name_</span><span class="p">]</span> 
       <span class="n">state</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">einsum</span><span class="p">(</span><span class="s1">&#39;ij,nj-&gt;ni&#39;</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">scaling_mat_</span> <span class="p">,</span> <span class="n">state</span><span class="p">)</span>
       <span class="n">result</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">einsum</span><span class="p">(</span><span class="s1">&#39;ijk,ik-&gt;ij&#39;</span><span class="p">,</span><span class="n">K</span><span class="p">,</span><span class="n">state</span> <span class="p">)</span>
-      
+     
       <span class="k">if</span> <span class="n">return_jacobian</span><span class="p">:</span>
-          <span class="k">return</span> <span class="n">result</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">scale_</span><span class="p">,</span> <span class="n">K</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">scale_</span>
+          <span class="n">jac</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">einsum</span><span class="p">(</span><span class="s1">&#39;ijk,kl-&gt;ijl&#39;</span><span class="p">,</span><span class="n">K</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">scaling_mat_</span><span class="p">)</span>
+          <span class="k">return</span> <span class="n">result</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">scale_</span><span class="p">,</span> <span class="n">jac</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">scale_</span>
       <span class="k">else</span><span class="p">:</span>
           <span class="k">return</span> <span class="n">result</span><span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">scale_</span></div>
 
@@ -735,7 +801,7 @@ v0.1.0 - Home"/>
 <span class="sd">        Number of nuerons in each hidden layer</span>
 
 <span class="sd">    activation : PyTorch activation function (e.g., torch.nn.functional.relu)</span>
-<span class="sd">        Activation function used at each layer</span>
+<span class="sd">        Activation function used at each hidden layer.</span>
 <span class="sd"> </span>
 <span class="sd">    name : string </span>
 <span class="sd">        Operator name. Used when saving to file </span>
@@ -749,7 +815,7 @@ v0.1.0 - Home"/>
 <span class="sd">    &gt;&gt;&gt; SkewMlp = nnopinf.operators.SkewOperator(acts_on=x_input,depends_on=(x_input,mu_input,),n_hidden_layers=2,n_neurons_per_layer=2)</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">acts_on</span><span class="p">,</span><span class="n">depends_on</span><span class="p">,</span><span class="n">n_hidden_layers</span><span class="p">,</span><span class="n">n_neurons_per_layer</span><span class="p">,</span><span class="n">activation</span><span class="o">=</span><span class="n">F</span><span class="o">.</span><span class="n">relu</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s1">&#39;SkewOperator&#39;</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">acts_on</span><span class="p">,</span><span class="n">depends_on</span><span class="p">,</span><span class="n">n_hidden_layers</span><span class="p">,</span><span class="n">n_neurons_per_layer</span><span class="p">,</span><span class="n">activation</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">tanh</span><span class="p">,</span><span class="n">name</span><span class="o">=</span><span class="s1">&#39;SkewOperator&#39;</span><span class="p">):</span>
         <span class="nb">super</span><span class="p">(</span><span class="n">SkewOperator</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">name_</span> <span class="o">=</span> <span class="n">name</span>
         <span class="n">forward_list</span> <span class="o">=</span> <span class="p">[]</span>
@@ -769,13 +835,10 @@ v0.1.0 - Home"/>
         <span class="bp">self</span><span class="o">.</span><span class="n">num_layers</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_hidden_layers</span> <span class="o">+</span> <span class="mi">1</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">scaling_mat_</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n_outputs_</span><span class="p">)</span>
 
-        <span class="n">n_inputs</span> <span class="o">=</span> <span class="mi">0</span>
-        <span class="k">for</span> <span class="n">operator_input</span> <span class="ow">in</span> <span class="n">depends_on</span><span class="p">:</span>
-          <span class="n">n_inputs</span> <span class="o">+=</span> <span class="n">operator_input</span><span class="o">.</span><span class="n">get_size</span><span class="p">()</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">n_inputs_</span> <span class="o">=</span> <span class="n">n_inputs</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">forward_list</span> <span class="o">=</span> <span class="n">create_layers</span><span class="p">(</span><span class="n">n_inputs</span><span class="p">,</span><span class="n">network_output_size</span><span class="p">,</span><span class="n">n_hidden_layers</span><span class="p">,</span><span class="n">n_neurons_per_layer</span><span class="p">)</span>
-
-        <span class="bp">self</span><span class="o">.</span><span class="n">activation</span> <span class="o">=</span> <span class="n">activation</span>  
+        <span class="bp">self</span><span class="o">.</span><span class="n">n_inputs_</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">var</span><span class="o">.</span><span class="n">get_size</span><span class="p">()</span> <span class="k">for</span> <span class="n">var</span> <span class="ow">in</span> <span class="n">depends_on</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">forward_list</span> <span class="o">=</span> <span class="n">create_layers</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n_inputs_</span><span class="p">,</span><span class="n">network_output_size</span><span class="p">,</span><span class="n">n_hidden_layers</span><span class="p">,</span><span class="n">n_neurons_per_layer</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">activation</span> <span class="o">=</span> <span class="n">activation</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">scalings_set_</span> <span class="o">=</span> <span class="kc">False</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">scaling_mat_</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n_outputs_</span><span class="p">)</span>     
 
 
@@ -790,8 +853,8 @@ v0.1.0 - Home"/>
 <span class="sd">      inputs : dict(str, np.array) </span>
 <span class="sd">          Dictionary of input data in the form of arrays referenced by the variable name, i.e., inputs[&#39;x&#39;] = np.ones(3)</span>
 <span class="sd">  </span>
-<span class="sd">      return_jacobian: bool </span>
-<span class="sd">          If the method returns the (approximate) Jacobian, A. </span>
+<span class="sd">      return_jacobian: bool, optional</span>
+<span class="sd">          If True, return the (approximate) Jacobian in addition to the output.</span>
 <span class="sd">  </span>
 <span class="sd">      Examples</span>
 <span class="sd">      --------</span>
@@ -877,7 +940,7 @@ v0.1.0 - Home"/>
 <span class="sd">        Number of nuerons in each hidden layer</span>
 
 <span class="sd">    activation : PyTorch activation function (e.g., torch.nn.functional.relu)</span>
-<span class="sd">        Activation function used at each layer</span>
+<span class="sd">        Activation function used at each hidden layer.</span>
 <span class="sd"> </span>
 <span class="sd">    name : string </span>
 <span class="sd">        Operator name. Used when saving to file </span>
@@ -891,7 +954,7 @@ v0.1.0 - Home"/>
 <span class="sd">    &gt;&gt;&gt; MatrixMlp = nnopinf.operators.MatrixOperator(n_outputs=5,acts_on=x_input,depends_on=(x_input,mu_input,),n_hidden_layers=2,n_neurons_per_layer=2)</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">n_outputs</span><span class="p">,</span><span class="n">acts_on</span><span class="p">,</span><span class="n">depends_on</span><span class="p">,</span><span class="n">n_hidden_layers</span><span class="p">,</span><span class="n">n_neurons_per_layer</span><span class="p">,</span><span class="n">activation</span><span class="o">=</span><span class="n">F</span><span class="o">.</span><span class="n">relu</span><span class="p">,</span><span class="n">name</span><span class="o">=</span><span class="s1">&#39;MatrixOperator&#39;</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">n_outputs</span><span class="p">,</span><span class="n">acts_on</span><span class="p">,</span><span class="n">depends_on</span><span class="p">,</span><span class="n">n_hidden_layers</span><span class="p">,</span><span class="n">n_neurons_per_layer</span><span class="p">,</span><span class="n">activation</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">tanh</span><span class="p">,</span><span class="n">name</span><span class="o">=</span><span class="s1">&#39;MatrixOperator&#39;</span><span class="p">):</span>
         <span class="nb">super</span><span class="p">(</span><span class="n">MatrixOperator</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">name_</span> <span class="o">=</span> <span class="n">name</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">n_outputs_</span> <span class="o">=</span> <span class="n">n_outputs</span> 
@@ -901,7 +964,6 @@ v0.1.0 - Home"/>
         <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">depends_on</span><span class="p">)):</span>
           <span class="bp">self</span><span class="o">.</span><span class="n">depends_on_names_</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">depends_on</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">get_name</span><span class="p">())</span>
           <span class="bp">self</span><span class="o">.</span><span class="n">n_inputs_</span> <span class="o">+=</span> <span class="n">depends_on</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">get_size</span><span class="p">()</span>
-
         <span class="n">network_output_size</span> <span class="o">=</span> <span class="n">acts_on</span><span class="o">.</span><span class="n">get_size</span><span class="p">()</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">n_outputs_</span> 
         <span class="bp">self</span><span class="o">.</span><span class="n">acts_on_size_</span> <span class="o">=</span> <span class="n">acts_on</span><span class="o">.</span><span class="n">get_size</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">num_hidden_layers</span> <span class="o">=</span> <span class="n">n_hidden_layers</span>
@@ -909,8 +971,10 @@ v0.1.0 - Home"/>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">forward_list</span> <span class="o">=</span> <span class="n">create_layers</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n_inputs_</span><span class="p">,</span><span class="n">network_output_size</span><span class="p">,</span><span class="n">n_hidden_layers</span><span class="p">,</span><span class="n">n_neurons_per_layer</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">activation</span> <span class="o">=</span> <span class="n">activation</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">scalings_set_</span> <span class="o">=</span> <span class="kc">False</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">scaling_mat_</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n_outputs_</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">scaling_mat2_</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n_outputs_</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">scaling_inputs_</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">acts_on_size_</span><span class="p">)</span> 
 
         <span class="bp">self</span><span class="o">.</span><span class="n">scalings_set_</span> <span class="o">=</span> <span class="kc">False</span>
 
@@ -925,8 +989,8 @@ v0.1.0 - Home"/>
 <span class="sd">      inputs : dict(str, np.array) </span>
 <span class="sd">          Dictionary of input data in the form of arrays referenced by the variable name, i.e., inputs[&#39;x&#39;] = np.ones(3)</span>
 <span class="sd">  </span>
-<span class="sd">      return_jacobian: bool </span>
-<span class="sd">          If the method returns the (approximate) Jacobian, A. </span>
+<span class="sd">      return_jacobian: bool, optional</span>
+<span class="sd">          If True, return the (approximate) Jacobian in addition to the output.</span>
 <span class="sd">  </span>
 <span class="sd">      Examples</span>
 <span class="sd">      --------</span>
@@ -946,9 +1010,11 @@ v0.1.0 - Home"/>
         <span class="n">y</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">activation</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">forward_list</span><span class="p">[</span><span class="n">i</span><span class="p">](</span><span class="n">y</span><span class="p">))</span>
       <span class="n">y</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">forward_list</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">](</span><span class="n">y</span><span class="p">)</span>
       <span class="n">A</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">y</span><span class="p">,(</span><span class="n">y</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span><span class="bp">self</span><span class="o">.</span><span class="n">n_outputs_</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">acts_on_size_</span><span class="p">))</span>
-      <span class="n">A</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">einsum</span><span class="p">(</span><span class="s1">&#39;ij,njk-&gt;nik&#39;</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">scaling_mat2_</span><span class="p">,</span><span class="n">A</span><span class="p">)</span>
+      <span class="n">A</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">einsum</span><span class="p">(</span><span class="s1">&#39;ij,njk-&gt;nik&#39;</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">scaling_mat_</span><span class="p">,</span><span class="n">A</span><span class="p">)</span>
       <span class="n">state</span> <span class="o">=</span> <span class="n">inputs</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">acts_on_name_</span><span class="p">]</span> 
-      <span class="n">state</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">einsum</span><span class="p">(</span><span class="s1">&#39;ij,nj-&gt;ni&#39;</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">scaling_mat_</span> <span class="p">,</span> <span class="n">state</span><span class="p">)</span>
+      <span class="c1">#print(self.scaling_mat_.shape,state.shape)</span>
+      <span class="n">state</span> <span class="o">=</span> <span class="n">state</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">scaling_inputs_</span><span class="p">[</span><span class="kc">None</span><span class="p">]</span> 
+      <span class="c1">#state = torch.einsum(&#39;ij,nj-&gt;ni&#39;,self.scaling_mat_ , state)</span>
       <span class="n">result</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">einsum</span><span class="p">(</span><span class="s1">&#39;ijk,ik-&gt;ij&#39;</span><span class="p">,</span><span class="n">A</span><span class="p">,</span><span class="n">state</span><span class="p">)</span>
       <span class="k">if</span> <span class="n">return_jacobian</span><span class="p">:</span>
           <span class="k">return</span> <span class="n">result</span><span class="p">[:,:],</span><span class="n">A</span>
@@ -974,7 +1040,356 @@ v0.1.0 - Home"/>
       <span class="c1">#final_layer.weight[:] =  ( torch.eye(self.n_outputs_) / input_scalings_dict[self.acts_on_name_] ) @ final_layer.weight[:] </span>
       <span class="c1">#final_layer.bias[:] =  ( torch.eye(self.n_outputs_) / input_scalings_dict[self.acts_on_name_]).flatten() * final_layer.bias[:]</span>
       <span class="bp">self</span><span class="o">.</span><span class="n">scaling_mat_</span><span class="p">[:]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n_outputs_</span><span class="p">)</span> <span class="o">*</span>  <span class="n">output_scaling</span>
-      <span class="bp">self</span><span class="o">.</span><span class="n">scaling_mat2_</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n_outputs_</span><span class="p">)</span> <span class="o">/</span>  <span class="n">input_scalings_dict</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">acts_on_name_</span><span class="p">]</span></div>
+      <span class="c1">#self.scaling_mat2_ = torch.eye(self.n_outputs_) /  input_scalings_dict[self.acts_on_name_]</span>
+      <span class="bp">self</span><span class="o">.</span><span class="n">scaling_inputs_</span> <span class="o">=</span> <span class="mf">1.</span><span class="o">/</span> <span class="n">input_scalings_dict</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">acts_on_name_</span><span class="p">]</span></div>
+
+
+
+<span class="k">class</span> <span class="nc">QuadraticOperator</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    :math:`f: x \mapsto H (x \\otimes x)`</span>
+
+<span class="sd">    Constructs a quadratic operator with a learnable matrix :math:`H` that acts</span>
+<span class="sd">    on the Kronecker product of the state with itself.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    n_outputs: int</span>
+<span class="sd">        Output dimension of the operator.</span>
+
+<span class="sd">    acts_on : nnopinf.Variable</span>
+<span class="sd">        The state the operator acts on, i.e., the :math:`x` in</span>
+<span class="sd">        :math:`H (x \\otimes x)`.</span>
+
+<span class="sd">    name : string</span>
+<span class="sd">        Operator name. Used when saving to file.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">n_outputs</span><span class="p">,</span><span class="n">acts_on</span><span class="p">,</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;QuadraticOperator&quot;</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">QuadraticOperator</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">name_</span> <span class="o">=</span> <span class="n">name</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">n_outputs_</span> <span class="o">=</span> <span class="n">n_outputs</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">acts_on_name_</span> <span class="o">=</span> <span class="n">acts_on</span><span class="o">.</span><span class="n">get_name</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">acts_on_size_</span> <span class="o">=</span> <span class="n">acts_on</span><span class="o">.</span><span class="n">get_size</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">H</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Parameter</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="n">n_outputs</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">acts_on_size_</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">acts_on_size_</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">scalings_set_</span> <span class="o">=</span> <span class="kc">False</span>
+
+    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">inputs</span><span class="p">,</span><span class="n">return_jacobian</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="w">      </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">      Forward pass of operator</span>
+
+<span class="sd">      Parameters</span>
+<span class="sd">      ----------</span>
+<span class="sd">      inputs : dict(str, np.array)</span>
+<span class="sd">          Dictionary of input data in the form of arrays referenced by the</span>
+<span class="sd">          variable name, i.e., inputs[&#39;x&#39;] = np.ones(3)</span>
+
+<span class="sd">      return_jacobian: bool, optional</span>
+<span class="sd">          If True, return the Jacobian with respect to the state.</span>
+<span class="sd">      &quot;&quot;&quot;</span>
+      <span class="n">x</span> <span class="o">=</span> <span class="n">inputs</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">acts_on_name_</span><span class="p">]</span>
+      <span class="n">x_outer</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">einsum</span><span class="p">(</span><span class="s1">&#39;bi,bj-&gt;bij&#39;</span><span class="p">,</span><span class="n">x</span><span class="p">,</span><span class="n">x</span><span class="p">)</span>
+      <span class="n">x_kron</span> <span class="o">=</span> <span class="n">x_outer</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">x</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+      <span class="n">result</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">einsum</span><span class="p">(</span><span class="s1">&#39;ij,bj-&gt;bi&#39;</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">H</span><span class="p">,</span><span class="n">x_kron</span><span class="p">)</span>
+      <span class="k">if</span> <span class="n">return_jacobian</span><span class="p">:</span>
+          <span class="n">H_mat</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">H</span><span class="o">.</span><span class="n">view</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n_outputs_</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">acts_on_size_</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">acts_on_size_</span><span class="p">)</span>
+          <span class="n">term1</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">einsum</span><span class="p">(</span><span class="s1">&#39;mij,bj-&gt;bmi&#39;</span><span class="p">,</span><span class="n">H_mat</span><span class="p">,</span><span class="n">x</span><span class="p">)</span>
+          <span class="n">term2</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">einsum</span><span class="p">(</span><span class="s1">&#39;mij,bi-&gt;bmj&#39;</span><span class="p">,</span><span class="n">H_mat</span><span class="p">,</span><span class="n">x</span><span class="p">)</span>
+          <span class="n">jac</span> <span class="o">=</span> <span class="n">term1</span> <span class="o">+</span> <span class="n">term2</span>
+          <span class="k">return</span> <span class="n">result</span><span class="p">,</span><span class="n">jac</span>
+      <span class="k">else</span><span class="p">:</span>
+          <span class="k">return</span> <span class="n">result</span>
+
+    <span class="k">def</span> <span class="nf">set_scalings</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">input_scalings_dict</span><span class="p">,</span><span class="n">output_scaling</span><span class="p">):</span>
+     <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+      <span class="bp">self</span><span class="o">.</span><span class="n">scalings_set_</span> <span class="o">=</span> <span class="kc">True</span>
+      <span class="n">input_scalings</span> <span class="o">=</span> <span class="n">input_scalings_dict</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">acts_on_name_</span><span class="p">]</span>
+      <span class="n">kron_scalings</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">einsum</span><span class="p">(</span><span class="s1">&#39;i,j-&gt;ij&#39;</span><span class="p">,</span><span class="n">input_scalings</span><span class="p">,</span><span class="n">input_scalings</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+      <span class="bp">self</span><span class="o">.</span><span class="n">H</span><span class="p">[:]</span> <span class="o">=</span> <span class="p">(</span><span class="n">output_scaling</span><span class="p">[:,</span><span class="kc">None</span><span class="p">]</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">H</span><span class="p">)</span> <span class="o">/</span> <span class="n">kron_scalings</span><span class="p">[</span><span class="kc">None</span><span class="p">,:]</span>
+
+
+<div class="viewcode-block" id="StandardLagrangianOperator">
+<a class="viewcode-back" href="../../generated/classes/nnopinf.operators.StandardLagrangianOperator.html#nnopinf.operators.StandardLagrangianOperator">[docs]</a>
+<span class="k">class</span> <span class="nc">StandardLagrangianOperator</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    :math:`f: x \\mapsto \\nabla_x \\mathcal{L}(x)`</span>
+
+<span class="sd">    Constructs a Lagrangian operator that returns the gradient of a scalar</span>
+<span class="sd">    network with respect to the state.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    n_outputs: int</span>
+<span class="sd">        Output dimension of the operator.</span>
+
+<span class="sd">    depends_on: tuple of nnopinf.Variable</span>
+<span class="sd">        The variables the operator depends on.</span>
+
+<span class="sd">    n_hidden_layers : int</span>
+<span class="sd">        Number of hidden layers in the network.</span>
+
+<span class="sd">    n_neurons_per_layer : int</span>
+<span class="sd">        Number of neurons in each hidden layer.</span>
+
+<span class="sd">    activation : PyTorch activation function (e.g., torch.tanh)</span>
+<span class="sd">        Activation function used at each hidden layer.</span>
+
+<span class="sd">    name : string</span>
+<span class="sd">        Operator name. Used when saving to file.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">n_outputs</span><span class="p">,</span><span class="n">depends_on</span><span class="p">,</span><span class="n">n_hidden_layers</span><span class="p">,</span><span class="n">n_neurons_per_layer</span><span class="p">,</span><span class="n">activation</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">tanh</span><span class="p">,</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;StandardLagrangianOperator&quot;</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">StandardLagrangianOperator</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">name_</span> <span class="o">=</span> <span class="n">name</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">depends_on_names_</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">input_size_</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">depends_on</span><span class="p">)):</span>
+          <span class="bp">self</span><span class="o">.</span><span class="n">depends_on_names_</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">depends_on</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">get_name</span><span class="p">())</span>
+          <span class="bp">self</span><span class="o">.</span><span class="n">input_size_</span> <span class="o">+=</span> <span class="n">depends_on</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">get_size</span><span class="p">()</span>
+
+        <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">depends_on</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;StandardLagrangianOperator supports a single state variable&quot;</span>
+        <span class="k">assert</span> <span class="n">n_outputs</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">input_size_</span><span class="p">,</span> <span class="s2">&quot;n_outputs must match the input size&quot;</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">n_outputs_</span> <span class="o">=</span> <span class="n">n_outputs</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">net_input_size_</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">input_size_</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">num_hidden_layers</span> <span class="o">=</span> <span class="n">n_hidden_layers</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">num_layers</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_hidden_layers</span> <span class="o">+</span> <span class="mi">1</span>
+
+        <span class="n">layer_dims</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">net_input_size_</span><span class="p">]</span> <span class="o">+</span> <span class="p">[</span><span class="n">n_neurons_per_layer</span><span class="p">]</span> <span class="o">*</span> <span class="n">n_hidden_layers</span> <span class="o">+</span> <span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">forward_list</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">layer_dims</span><span class="p">)):</span>
+          <span class="n">in_dim</span> <span class="o">=</span> <span class="n">layer_dims</span><span class="p">[</span><span class="n">i</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span>
+          <span class="n">out_dim</span> <span class="o">=</span> <span class="n">layer_dims</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+          <span class="n">bias</span> <span class="o">=</span> <span class="kc">False</span> <span class="k">if</span> <span class="n">i</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">layer_dims</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span> <span class="k">else</span> <span class="kc">True</span>
+          <span class="n">forward_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="n">in_dim</span><span class="p">,</span> <span class="n">out_dim</span><span class="p">,</span> <span class="n">bias</span><span class="o">=</span><span class="n">bias</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">forward_list</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">ModuleList</span><span class="p">(</span><span class="n">forward_list</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">activation</span> <span class="o">=</span> <span class="n">activation</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">input_scalings_</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">input_size_</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">output_scalings_</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n_outputs_</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">scalings_set_</span> <span class="o">=</span> <span class="kc">False</span>
+
+    <span class="k">def</span> <span class="nf">_build_features</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">x</span>
+
+    <span class="k">def</span> <span class="nf">_net</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">x_feat</span><span class="p">):</span>
+        <span class="n">y</span> <span class="o">=</span> <span class="n">x_feat</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">num_layers</span><span class="o">-</span><span class="mi">1</span><span class="p">):</span>
+          <span class="n">y</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">activation</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">forward_list</span><span class="p">[</span><span class="n">i</span><span class="p">](</span><span class="n">y</span><span class="p">))</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">forward_list</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">](</span><span class="n">y</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">_grad</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">x</span><span class="p">):</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">x</span><span class="o">.</span><span class="n">detach</span><span class="p">()</span><span class="o">.</span><span class="n">requires_grad_</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">x_feat</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_features</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="n">y</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_net</span><span class="p">(</span><span class="n">x_feat</span><span class="p">))</span>
+        <span class="n">grad</span><span class="p">,</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">autograd</span><span class="o">.</span><span class="n">grad</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">create_graph</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">grad</span>
+
+    <span class="k">def</span> <span class="nf">_hessian</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">x</span><span class="p">):</span>
+        <span class="n">hessians</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">x</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]):</span>
+          <span class="n">xi</span> <span class="o">=</span> <span class="n">x</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+          <span class="k">def</span> <span class="nf">scalar_fn</span><span class="p">(</span><span class="n">z</span><span class="p">):</span>
+            <span class="n">z_feat</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_features</span><span class="p">(</span><span class="n">z</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">0</span><span class="p">))</span>
+            <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_net</span><span class="p">(</span><span class="n">z_feat</span><span class="p">))</span>
+          <span class="n">hess</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">autograd</span><span class="o">.</span><span class="n">functional</span><span class="o">.</span><span class="n">hessian</span><span class="p">(</span><span class="n">scalar_fn</span><span class="p">,</span> <span class="n">xi</span><span class="p">,</span> <span class="n">create_graph</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+          <span class="n">hessians</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">hess</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">stack</span><span class="p">(</span><span class="n">hessians</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+
+<div class="viewcode-block" id="StandardLagrangianOperator.forward">
+<a class="viewcode-back" href="../../generated/classes/nnopinf.operators.StandardLagrangianOperator.html#nnopinf.operators.StandardLagrangianOperator.forward">[docs]</a>
+    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">inputs</span><span class="p">,</span><span class="n">return_jacobian</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="w">      </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">      Forward pass of operator</span>
+
+<span class="sd">      Parameters</span>
+<span class="sd">      ----------</span>
+<span class="sd">      inputs : dict(str, np.array)</span>
+<span class="sd">          Dictionary of input data in the form of arrays referenced by the</span>
+<span class="sd">          variable name, i.e., inputs[&#39;x&#39;] = np.ones(3)</span>
+
+<span class="sd">      return_jacobian: bool, optional</span>
+<span class="sd">          If True, return the (approximate) Jacobian in addition to the output.</span>
+<span class="sd">      &quot;&quot;&quot;</span>
+      <span class="n">x</span> <span class="o">=</span> <span class="n">inputs_to_tensor</span><span class="p">(</span><span class="n">inputs</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">depends_on_names_</span><span class="p">)</span>
+      <span class="n">x_scaled</span> <span class="o">=</span> <span class="n">x</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">input_scalings_</span>
+      <span class="n">grad_scaled</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_grad</span><span class="p">(</span><span class="n">x_scaled</span><span class="p">)</span>
+      <span class="n">grad</span> <span class="o">=</span> <span class="p">(</span><span class="n">grad_scaled</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">output_scalings_</span><span class="p">)</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">input_scalings_</span>
+      <span class="k">if</span> <span class="n">return_jacobian</span><span class="p">:</span>
+          <span class="n">hess_scaled</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_hessian</span><span class="p">(</span><span class="n">x_scaled</span><span class="p">)</span>
+          <span class="n">row_scale</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">output_scalings_</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">input_scalings_</span><span class="p">)</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
+          <span class="n">col_scale</span> <span class="o">=</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">input_scalings_</span><span class="p">)</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+          <span class="n">jac</span> <span class="o">=</span> <span class="n">row_scale</span> <span class="o">*</span> <span class="n">hess_scaled</span> <span class="o">*</span> <span class="n">col_scale</span>
+          <span class="k">return</span> <span class="o">-</span><span class="n">grad</span><span class="p">[:,:],</span> <span class="o">-</span><span class="n">jac</span>
+      <span class="k">else</span><span class="p">:</span>
+          <span class="k">return</span> <span class="o">-</span><span class="n">grad</span><span class="p">[:,:]</span></div>
+
+
+    <span class="k">def</span> <span class="nf">set_scalings</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">input_scalings_dict</span><span class="p">,</span><span class="n">output_scaling</span><span class="p">):</span>
+     <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+      <span class="bp">self</span><span class="o">.</span><span class="n">scalings_set_</span> <span class="o">=</span> <span class="kc">True</span>
+      <span class="n">input_scalings</span> <span class="o">=</span> <span class="kc">None</span>
+      <span class="k">for</span> <span class="n">input_arg</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">depends_on_names_</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">input_scalings</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+          <span class="n">input_scalings</span> <span class="o">=</span> <span class="n">input_scalings_dict</span><span class="p">[</span><span class="n">input_arg</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+          <span class="n">input_scalings</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">(</span> <span class="p">(</span><span class="n">input_scalings</span><span class="p">,</span><span class="n">input_scalings_dict</span><span class="p">[</span><span class="n">input_arg</span><span class="p">]),</span><span class="mi">0</span><span class="p">)</span>
+      <span class="bp">self</span><span class="o">.</span><span class="n">input_scalings_</span><span class="p">[:]</span> <span class="o">=</span> <span class="n">input_scalings</span>
+      <span class="bp">self</span><span class="o">.</span><span class="n">output_scalings_</span><span class="p">[:]</span> <span class="o">=</span> <span class="n">output_scaling</span></div>
+
+
+
+<div class="viewcode-block" id="PsdLagrangianOperator">
+<a class="viewcode-back" href="../../generated/classes/nnopinf.operators.PsdLagrangianOperator.html#nnopinf.operators.PsdLagrangianOperator">[docs]</a>
+<span class="k">class</span> <span class="nc">PsdLagrangianOperator</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    :math:`f: x \\mapsto \\nabla_x \\mathcal{L}(x)` where</span>
+<span class="sd">    :math:`\\mathcal{L}(x) = x^T A(x) x` and :math:`A(x)` is an SPD operator.</span>
+
+<span class="sd">    Constructs a Lagrangian operator whose internal scalar network is formed</span>
+<span class="sd">    by an SPD operator acting on the state and then left-multiplied by the state.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    acts_on : nnopinf.Variable</span>
+<span class="sd">        The state the operator acts on, i.e., the :math:`x`.</span>
+
+<span class="sd">    depends_on: tuple of nnopinf.Variable</span>
+<span class="sd">        The variables the operator depends on.</span>
+
+<span class="sd">    n_hidden_layers : int</span>
+<span class="sd">        Number of hidden layers in the SPD network.</span>
+
+<span class="sd">    n_neurons_per_layer : int</span>
+<span class="sd">        Number of neurons in each hidden layer.</span>
+
+<span class="sd">    activation : PyTorch activation function (e.g., torch.nn.functional.relu)</span>
+<span class="sd">        Activation function used at each hidden layer.</span>
+
+<span class="sd">    positive : bool</span>
+<span class="sd">        If operator is SPD or NPD.</span>
+
+<span class="sd">    name : string</span>
+<span class="sd">        Operator name. Used when saving to file.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">acts_on</span><span class="p">,</span>
+        <span class="n">depends_on</span><span class="p">,</span>
+        <span class="n">n_hidden_layers</span><span class="p">,</span>
+        <span class="n">n_neurons_per_layer</span><span class="p">,</span>
+        <span class="n">activation</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">tanh</span><span class="p">,</span>
+        <span class="n">positive</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">name</span><span class="o">=</span><span class="s2">&quot;PsdLagrangianOperator&quot;</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">PsdLagrangianOperator</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">name_</span> <span class="o">=</span> <span class="n">name</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">acts_on_name_</span> <span class="o">=</span> <span class="n">acts_on</span><span class="o">.</span><span class="n">get_name</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">acts_on_size_</span> <span class="o">=</span> <span class="n">acts_on</span><span class="o">.</span><span class="n">get_size</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">depends_on_names_</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">n_inputs_</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">depends_on</span><span class="p">)):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">depends_on_names_</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">depends_on</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">get_name</span><span class="p">())</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">n_inputs_</span> <span class="o">+=</span> <span class="n">depends_on</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">get_size</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">n_outputs_</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">acts_on_size_</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">spd_operator_</span> <span class="o">=</span> <span class="n">SpdOperator</span><span class="p">(</span>
+            <span class="n">acts_on</span><span class="o">=</span><span class="n">acts_on</span><span class="p">,</span>
+            <span class="n">depends_on</span><span class="o">=</span><span class="n">depends_on</span><span class="p">,</span>
+            <span class="n">n_hidden_layers</span><span class="o">=</span><span class="n">n_hidden_layers</span><span class="p">,</span>
+            <span class="n">n_neurons_per_layer</span><span class="o">=</span><span class="n">n_neurons_per_layer</span><span class="p">,</span>
+            <span class="n">activation</span><span class="o">=</span><span class="n">activation</span><span class="p">,</span>
+            <span class="n">positive</span><span class="o">=</span><span class="n">positive</span><span class="p">,</span>
+            <span class="n">parameterization</span><span class="o">=</span><span class="s1">&#39;cholesky&#39;</span><span class="p">,</span>
+            <span class="n">name</span><span class="o">=</span><span class="n">name</span> <span class="o">+</span> <span class="s2">&quot;_SpdOperator&quot;</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">input_scalings_dict_</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">input_scalings_</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n_outputs_</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">output_scalings_</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n_outputs_</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">scalings_set_</span> <span class="o">=</span> <span class="kc">False</span>
+
+    <span class="k">def</span> <span class="nf">_scale_inputs</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">inputs</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">scalings_set_</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">inputs</span>
+        <span class="n">scaled_inputs</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">input_arg</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">depends_on_names_</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">input_arg</span> <span class="ow">in</span> <span class="n">scaled_inputs</span><span class="p">:</span>
+                <span class="n">scaled_inputs</span><span class="p">[</span><span class="n">input_arg</span><span class="p">]</span> <span class="o">=</span> <span class="n">scaled_inputs</span><span class="p">[</span><span class="n">input_arg</span><span class="p">]</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">input_scalings_dict_</span><span class="p">[</span><span class="n">input_arg</span><span class="p">]</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">acts_on_name_</span> <span class="ow">in</span> <span class="n">scaled_inputs</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">acts_on_name_</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">depends_on_names_</span><span class="p">:</span>
+            <span class="n">scaled_inputs</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">acts_on_name_</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">scaled_inputs</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">acts_on_name_</span><span class="p">]</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">input_scalings_dict_</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">acts_on_name_</span><span class="p">]</span>
+            <span class="p">)</span>
+        <span class="k">return</span> <span class="n">scaled_inputs</span>
+
+    <span class="k">def</span> <span class="nf">_net</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">inputs</span><span class="p">):</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">inputs</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">acts_on_name_</span><span class="p">]</span>
+        <span class="n">spd_out</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">spd_operator_</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span>
+        <span class="n">scalar</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">x</span> <span class="o">*</span> <span class="n">spd_out</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">keepdim</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">scalar</span>
+
+    <span class="k">def</span> <span class="nf">_grad</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">inputs</span><span class="p">):</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">inputs</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">acts_on_name_</span><span class="p">]</span><span class="o">.</span><span class="n">detach</span><span class="p">()</span><span class="o">.</span><span class="n">requires_grad_</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">inputs_local</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span>
+        <span class="n">inputs_local</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">acts_on_name_</span><span class="p">]</span> <span class="o">=</span> <span class="n">x</span>
+        <span class="n">y</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_net</span><span class="p">(</span><span class="n">inputs_local</span><span class="p">))</span>
+        <span class="n">grad</span><span class="p">,</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">autograd</span><span class="o">.</span><span class="n">grad</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">create_graph</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">grad</span>
+
+    <span class="k">def</span> <span class="nf">_hessian</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">inputs</span><span class="p">):</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">inputs</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">acts_on_name_</span><span class="p">]</span>
+        <span class="n">hessians</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">x</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]):</span>
+            <span class="n">xi</span> <span class="o">=</span> <span class="n">x</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+
+            <span class="k">def</span> <span class="nf">scalar_fn</span><span class="p">(</span><span class="n">z</span><span class="p">):</span>
+                <span class="n">inputs_local</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span>
+                <span class="n">inputs_local</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">acts_on_name_</span><span class="p">]</span> <span class="o">=</span> <span class="n">z</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_net</span><span class="p">(</span><span class="n">inputs_local</span><span class="p">))</span>
+
+            <span class="n">hess</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">autograd</span><span class="o">.</span><span class="n">functional</span><span class="o">.</span><span class="n">hessian</span><span class="p">(</span><span class="n">scalar_fn</span><span class="p">,</span> <span class="n">xi</span><span class="p">,</span> <span class="n">create_graph</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="n">hessians</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">hess</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">torch</span><span class="o">.</span><span class="n">stack</span><span class="p">(</span><span class="n">hessians</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+
+<div class="viewcode-block" id="PsdLagrangianOperator.forward">
+<a class="viewcode-back" href="../../generated/classes/nnopinf.operators.PsdLagrangianOperator.html#nnopinf.operators.PsdLagrangianOperator.forward">[docs]</a>
+    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">inputs</span><span class="p">,</span> <span class="n">return_jacobian</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Forward pass of operator</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        inputs : dict(str, np.array)</span>
+<span class="sd">            Dictionary of input data in the form of arrays referenced by the</span>
+<span class="sd">            variable name, i.e., inputs[&#39;x&#39;] = np.ones(3)</span>
+
+<span class="sd">        return_jacobian: bool, optional</span>
+<span class="sd">            If True, return the (approximate) Jacobian in addition to the output.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">scaled_inputs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_scale_inputs</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span>
+        <span class="n">grad_scaled</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_grad</span><span class="p">(</span><span class="n">scaled_inputs</span><span class="p">)</span>
+        <span class="n">grad</span> <span class="o">=</span> <span class="n">grad_scaled</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">output_scalings_</span> 
+        <span class="k">if</span> <span class="n">return_jacobian</span><span class="p">:</span>
+            <span class="n">hess_scaled</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_hessian</span><span class="p">(</span><span class="n">scaled_inputs</span><span class="p">)</span>
+            <span class="n">row_scale</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">output_scalings_</span><span class="p">)</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
+            <span class="n">col_scale</span> <span class="o">=</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">input_scalings_</span><span class="p">)</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+            <span class="n">jac</span> <span class="o">=</span> <span class="n">row_scale</span> <span class="o">*</span> <span class="n">hess_scaled</span> <span class="o">*</span> <span class="n">col_scale</span>
+            <span class="k">return</span> <span class="n">grad</span><span class="p">[:,</span> <span class="p">:],</span> <span class="n">jac</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">grad</span><span class="p">[:,</span> <span class="p">:]</span></div>
+
+
+    <span class="k">def</span> <span class="nf">set_scalings</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">input_scalings_dict</span><span class="p">,</span> <span class="n">output_scaling</span><span class="p">):</span>
+        <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">scalings_set_</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">input_scalings_dict_</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="k">for</span> <span class="n">input_arg</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">depends_on_names_</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">input_scalings_dict_</span><span class="p">[</span><span class="n">input_arg</span><span class="p">]</span> <span class="o">=</span> <span class="n">input_scalings_dict</span><span class="p">[</span><span class="n">input_arg</span><span class="p">]</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">acts_on_name_</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">input_scalings_dict_</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">input_scalings_dict_</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">acts_on_name_</span><span class="p">]</span> <span class="o">=</span> <span class="n">input_scalings_dict</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">acts_on_name_</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">input_scalings_</span><span class="p">[:]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">input_scalings_dict_</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">acts_on_name_</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">output_scalings_</span><span class="p">[:]</span> <span class="o">=</span> <span class="n">output_scaling</span></div>
 
 
 
@@ -1008,10 +1423,12 @@ v0.1.0 - Home"/>
         <span class="bp">self</span><span class="o">.</span><span class="n">acts_on_name_</span> <span class="o">=</span> <span class="n">acts_on</span><span class="o">.</span><span class="n">get_name</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">acts_on_size_</span> <span class="o">=</span> <span class="n">acts_on</span><span class="o">.</span><span class="n">get_size</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">depends_on_names_</span> <span class="o">=</span> <span class="p">[]</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">n_inputs_</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">n_inputs_total</span> <span class="o">=</span> <span class="mi">0</span>
         <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">depends_on</span><span class="p">)):</span>
           <span class="bp">self</span><span class="o">.</span><span class="n">depends_on_names_</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">depends_on</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">get_name</span><span class="p">())</span>
-          <span class="bp">self</span><span class="o">.</span><span class="n">n_inputs_</span> <span class="o">+=</span> <span class="n">depends_on</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">get_size</span><span class="p">()</span>
+          <span class="n">n_inputs_total</span> <span class="o">+=</span> <span class="n">depends_on</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">get_size</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">has_affine_inputs_</span> <span class="o">=</span> <span class="p">(</span><span class="n">n_inputs_total</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">n_inputs_</span> <span class="o">=</span> <span class="p">(</span><span class="n">n_inputs_total</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">has_affine_inputs_</span> <span class="k">else</span> <span class="mi">1</span><span class="p">)</span>
         <span class="c1"># Learnable tensor -- unstructured</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">T</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Parameter</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">([</span><span class="n">n_outputs</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">acts_on_size_</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">n_inputs_</span><span class="p">]))</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">name_</span> <span class="o">=</span> <span class="n">name</span>
@@ -1028,14 +1445,17 @@ v0.1.0 - Home"/>
 <span class="sd">      inputs : dict(str, np.array) </span>
 <span class="sd">          Dictionary of input data in the form of arrays referenced by the variable name, i.e., inputs[&#39;x&#39;] = np.ones(3)</span>
 <span class="sd">  </span>
-<span class="sd">      return_jacobian: bool </span>
-<span class="sd">          If the method returns the (approximate) Jacobian, A. </span>
+<span class="sd">      return_jacobian: bool, optional</span>
+<span class="sd">          If True, return the (approximate) Jacobian in addition to the output.</span>
 <span class="sd">  </span>
 <span class="sd">      &quot;&quot;&quot;</span>
 
       <span class="c1"># Separate out states and parameters</span>
       <span class="n">x</span> <span class="o">=</span> <span class="n">inputs</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">acts_on_name_</span><span class="p">]</span>
-      <span class="n">mu</span> <span class="o">=</span> <span class="n">inputs_to_tensor</span><span class="p">(</span><span class="n">inputs</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">depends_on_names_</span><span class="p">)</span>
+      <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">has_affine_inputs_</span><span class="p">:</span>
+        <span class="n">mu</span> <span class="o">=</span> <span class="n">inputs_to_tensor</span><span class="p">(</span><span class="n">inputs</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">depends_on_names_</span><span class="p">)</span>
+      <span class="k">else</span><span class="p">:</span>
+        <span class="n">mu</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">((</span><span class="n">x</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="mi">1</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">x</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">x</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
       <span class="c1"># Compute product (T*mu)x</span>
       <span class="n">result</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">einsum</span><span class="p">(</span><span class="s1">&#39;ijp,bj,bp-&gt;bi&#39;</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">T</span><span class="p">,</span><span class="n">x</span><span class="p">,</span><span class="n">mu</span><span class="p">)</span>
 
@@ -1050,12 +1470,15 @@ v0.1.0 - Home"/>
     <span class="k">def</span> <span class="nf">set_scalings</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">input_scalings_dict</span><span class="p">,</span><span class="n">output_scaling</span><span class="p">):</span>
      <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
       <span class="bp">self</span><span class="o">.</span><span class="n">scalings_set_</span> <span class="o">=</span> <span class="kc">True</span>
-      <span class="n">input_scalings</span> <span class="o">=</span> <span class="kc">None</span>
-      <span class="k">for</span> <span class="n">input_arg</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">depends_on_names_</span><span class="p">:</span>
-        <span class="k">if</span> <span class="n">input_scalings</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-          <span class="n">input_scalings</span> <span class="o">=</span> <span class="n">input_scalings_dict</span><span class="p">[</span><span class="n">input_arg</span><span class="p">]</span>
-        <span class="k">else</span><span class="p">:</span>
-          <span class="n">input_scalings</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">(</span> <span class="p">(</span><span class="n">input_scalings</span><span class="p">,</span><span class="n">input_scalings_dict</span><span class="p">[</span><span class="n">input_arg</span><span class="p">]),</span><span class="mi">0</span><span class="p">)</span>
+      <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">has_affine_inputs_</span><span class="p">:</span>
+        <span class="n">input_scalings</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">for</span> <span class="n">input_arg</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">depends_on_names_</span><span class="p">:</span>
+          <span class="k">if</span> <span class="n">input_scalings</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">input_scalings</span> <span class="o">=</span> <span class="n">input_scalings_dict</span><span class="p">[</span><span class="n">input_arg</span><span class="p">]</span>
+          <span class="k">else</span><span class="p">:</span>
+            <span class="n">input_scalings</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">(</span> <span class="p">(</span><span class="n">input_scalings</span><span class="p">,</span><span class="n">input_scalings_dict</span><span class="p">[</span><span class="n">input_arg</span><span class="p">]),</span><span class="mi">0</span><span class="p">)</span>
+      <span class="k">else</span><span class="p">:</span>
+        <span class="n">input_scalings</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">T</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="p">:])</span>
       
       <span class="c1">#for i in range(0,self.T.shape[-1]):</span>
       <span class="bp">self</span><span class="o">.</span><span class="n">input_scalings_</span> <span class="o">=</span> <span class="n">input_scalings</span>
@@ -1103,10 +1526,12 @@ v0.1.0 - Home"/>
         <span class="bp">self</span><span class="o">.</span><span class="n">n_outputs_</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">acts_on_size_</span> 
 
         <span class="bp">self</span><span class="o">.</span><span class="n">depends_on_names_</span> <span class="o">=</span> <span class="p">[]</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">n_inputs_</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">n_inputs_total</span> <span class="o">=</span> <span class="mi">0</span>
         <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">depends_on</span><span class="p">)):</span>
           <span class="bp">self</span><span class="o">.</span><span class="n">depends_on_names_</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">depends_on</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">get_name</span><span class="p">())</span>
-          <span class="bp">self</span><span class="o">.</span><span class="n">n_inputs_</span> <span class="o">+=</span> <span class="n">depends_on</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">get_size</span><span class="p">()</span>
+          <span class="n">n_inputs_total</span> <span class="o">+=</span> <span class="n">depends_on</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">get_size</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">has_affine_inputs_</span> <span class="o">=</span> <span class="p">(</span><span class="n">n_inputs_total</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">n_inputs_</span> <span class="o">=</span> <span class="p">(</span><span class="n">n_inputs_total</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">has_affine_inputs_</span> <span class="k">else</span> <span class="mi">1</span><span class="p">)</span>
 
         <span class="c1"># set dims and indices based on skew or sym</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">skew</span><span class="p">:</span> 
@@ -1139,13 +1564,16 @@ v0.1.0 - Home"/>
 <span class="sd">      inputs : dict(str, np.array) </span>
 <span class="sd">          Dictionary of input data in the form of arrays referenced by the variable name, i.e., inputs[&#39;x&#39;] = np.ones(3)</span>
 <span class="sd">  </span>
-<span class="sd">      return_jacobian: bool </span>
-<span class="sd">          If the method returns the (approximate) Jacobian, A. </span>
+<span class="sd">      return_jacobian: bool, optional</span>
+<span class="sd">          If True, return the (approximate) Jacobian in addition to the output.</span>
 <span class="sd">      &quot;&quot;&quot;</span>
       <span class="k">assert</span> <span class="n">return_jacobian</span> <span class="o">==</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">&quot;Return jacobian currently not implemented for linear skew operator&quot;</span>
       <span class="c1"># Separate out states and parameters</span>
       <span class="n">x</span> <span class="o">=</span> <span class="n">inputs</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">acts_on_name_</span><span class="p">]</span>
-      <span class="n">mu</span> <span class="o">=</span> <span class="n">inputs_to_tensor</span><span class="p">(</span><span class="n">inputs</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">depends_on_names_</span><span class="p">)</span>
+      <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">has_affine_inputs_</span><span class="p">:</span>
+        <span class="n">mu</span> <span class="o">=</span> <span class="n">inputs_to_tensor</span><span class="p">(</span><span class="n">inputs</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">depends_on_names_</span><span class="p">)</span>
+      <span class="k">else</span><span class="p">:</span>
+        <span class="n">mu</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">((</span><span class="n">x</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="mi">1</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">x</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">x</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
       <span class="n">mu</span> <span class="o">=</span> <span class="n">mu</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">input_scalings_</span>
       <span class="c1"># Fill tensor with learnable parameters</span>
       <span class="n">S</span>  <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n_outputs_</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">n_outputs_</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">n_inputs_</span><span class="p">)</span>
@@ -1164,12 +1592,15 @@ v0.1.0 - Home"/>
     <span class="k">def</span> <span class="nf">set_scalings</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">input_scalings_dict</span><span class="p">,</span><span class="n">output_scaling</span><span class="p">):</span>
      <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
       <span class="bp">self</span><span class="o">.</span><span class="n">scalings_set_</span> <span class="o">=</span> <span class="kc">True</span>
-      <span class="n">input_scalings</span> <span class="o">=</span> <span class="kc">None</span>
-      <span class="k">for</span> <span class="n">input_arg</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">depends_on_names_</span><span class="p">:</span>
-        <span class="k">if</span> <span class="n">input_scalings</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-          <span class="n">input_scalings</span> <span class="o">=</span> <span class="n">input_scalings_dict</span><span class="p">[</span><span class="n">input_arg</span><span class="p">]</span>
-        <span class="k">else</span><span class="p">:</span>
-          <span class="n">input_scalings</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">(</span> <span class="p">(</span><span class="n">input_scalings</span><span class="p">,</span><span class="n">input_scalings_dict</span><span class="p">[</span><span class="n">input_arg</span><span class="p">]),</span><span class="mi">0</span><span class="p">)</span>
+      <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">has_affine_inputs_</span><span class="p">:</span>
+        <span class="n">input_scalings</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">for</span> <span class="n">input_arg</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">depends_on_names_</span><span class="p">:</span>
+          <span class="k">if</span> <span class="n">input_scalings</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">input_scalings</span> <span class="o">=</span> <span class="n">input_scalings_dict</span><span class="p">[</span><span class="n">input_arg</span><span class="p">]</span>
+          <span class="k">else</span><span class="p">:</span>
+            <span class="n">input_scalings</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">(</span> <span class="p">(</span><span class="n">input_scalings</span><span class="p">,</span><span class="n">input_scalings_dict</span><span class="p">[</span><span class="n">input_arg</span><span class="p">]),</span><span class="mi">0</span><span class="p">)</span>
+      <span class="k">else</span><span class="p">:</span>
+        <span class="n">input_scalings</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">input_scalings_</span><span class="p">)</span>
       <span class="c1"># Update initial layer weights</span>
       <span class="bp">self</span><span class="o">.</span><span class="n">input_scalings_</span><span class="p">[:]</span> <span class="o">=</span> <span class="n">input_scalings</span>
       <span class="bp">self</span><span class="o">.</span><span class="n">output_scalings_</span><span class="p">[:]</span> <span class="o">=</span> <span class="n">output_scaling</span>
@@ -1209,10 +1640,12 @@ v0.1.0 - Home"/>
         <span class="bp">self</span><span class="o">.</span><span class="n">n_outputs_</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">acts_on_size_</span> 
 
         <span class="bp">self</span><span class="o">.</span><span class="n">depends_on_names_</span> <span class="o">=</span> <span class="p">[]</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">n_inputs_</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">n_inputs_total</span> <span class="o">=</span> <span class="mi">0</span>
         <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">depends_on</span><span class="p">)):</span>
           <span class="bp">self</span><span class="o">.</span><span class="n">depends_on_names_</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">depends_on</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">get_name</span><span class="p">())</span>
-          <span class="bp">self</span><span class="o">.</span><span class="n">n_inputs_</span> <span class="o">+=</span> <span class="n">depends_on</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">get_size</span><span class="p">()</span>
+          <span class="n">n_inputs_total</span> <span class="o">+=</span> <span class="n">depends_on</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">get_size</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">has_affine_inputs_</span> <span class="o">=</span> <span class="p">(</span><span class="n">n_inputs_total</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">n_inputs_</span> <span class="o">=</span> <span class="p">(</span><span class="n">n_inputs_total</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">has_affine_inputs_</span> <span class="k">else</span> <span class="mi">1</span><span class="p">)</span>
 
         <span class="c1"># set dims and indices</span>
         <span class="n">ldim</span>      <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n_outputs_</span><span class="o">*</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">n_outputs_</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span><span class="o">/</span><span class="mi">2</span><span class="p">)</span>
@@ -1232,7 +1665,7 @@ v0.1.0 - Home"/>
 
 <div class="viewcode-block" id="LinearAffineSpdTensorOperator.forward">
 <a class="viewcode-back" href="../../generated/classes/nnopinf.operators.LinearAffineSpdTensorOperator.html#nnopinf.operators.LinearAffineSpdTensorOperator.forward">[docs]</a>
-    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">inputs</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">inputs</span><span class="p">,</span> <span class="n">return_jacobian</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
 <span class="w">      </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">      Forward pass of operator </span>
 
@@ -1243,14 +1676,17 @@ v0.1.0 - Home"/>
 <span class="sd">      inputs : dict(str, np.array) </span>
 <span class="sd">          Dictionary of input data in the form of arrays referenced by the variable name, i.e., inputs[&#39;x&#39;] = np.ones(3)</span>
 <span class="sd">  </span>
-<span class="sd">      return_jacobian: bool </span>
-<span class="sd">          If the method returns the (approximate) Jacobian, A. </span>
+<span class="sd">      return_jacobian: bool, optional</span>
+<span class="sd">          If True, return the (approximate) Jacobian in addition to the output.</span>
 <span class="sd">      &quot;&quot;&quot;</span>
       <span class="k">assert</span> <span class="n">return_jacobian</span> <span class="o">==</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">&quot;Return jacobian currently not implemented for linear skew operator&quot;</span>
 
       <span class="c1"># Separate out states and parameters</span>
       <span class="n">x</span> <span class="o">=</span> <span class="n">inputs</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">acts_on_name_</span><span class="p">]</span>
-      <span class="n">mu</span> <span class="o">=</span> <span class="n">inputs_to_tensor</span><span class="p">(</span><span class="n">inputs</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">depends_on_names_</span><span class="p">)</span>
+      <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">has_affine_inputs_</span><span class="p">:</span>
+        <span class="n">mu</span> <span class="o">=</span> <span class="n">inputs_to_tensor</span><span class="p">(</span><span class="n">inputs</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">depends_on_names_</span><span class="p">)</span>
+      <span class="k">else</span><span class="p">:</span>
+        <span class="n">mu</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones</span><span class="p">((</span><span class="n">x</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="mi">1</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">x</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="n">x</span><span class="o">.</span><span class="n">device</span><span class="p">)</span>
       <span class="n">mu</span> <span class="o">=</span> <span class="n">mu</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">input_scalings_</span>
 
       <span class="c1"># Fill tensor with learnable parameters</span>
@@ -1272,12 +1708,15 @@ v0.1.0 - Home"/>
     <span class="k">def</span> <span class="nf">set_scalings</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span><span class="n">input_scalings_dict</span><span class="p">,</span><span class="n">output_scaling</span><span class="p">):</span>
      <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
       <span class="bp">self</span><span class="o">.</span><span class="n">scalings_set_</span> <span class="o">=</span> <span class="kc">True</span>
-      <span class="n">input_scalings</span> <span class="o">=</span> <span class="kc">None</span>
-      <span class="k">for</span> <span class="n">input_arg</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">depends_on_names_</span><span class="p">:</span>
-        <span class="k">if</span> <span class="n">input_scalings</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-          <span class="n">input_scalings</span> <span class="o">=</span> <span class="n">input_scalings_dict</span><span class="p">[</span><span class="n">input_arg</span><span class="p">]</span>
-        <span class="k">else</span><span class="p">:</span>
-          <span class="n">input_scalings</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">(</span> <span class="p">(</span><span class="n">input_scalings</span><span class="p">,</span><span class="n">input_scalings_dict</span><span class="p">[</span><span class="n">input_arg</span><span class="p">]),</span><span class="mi">0</span><span class="p">)</span>
+      <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">has_affine_inputs_</span><span class="p">:</span>
+        <span class="n">input_scalings</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">for</span> <span class="n">input_arg</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">depends_on_names_</span><span class="p">:</span>
+          <span class="k">if</span> <span class="n">input_scalings</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">input_scalings</span> <span class="o">=</span> <span class="n">input_scalings_dict</span><span class="p">[</span><span class="n">input_arg</span><span class="p">]</span>
+          <span class="k">else</span><span class="p">:</span>
+            <span class="n">input_scalings</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">(</span> <span class="p">(</span><span class="n">input_scalings</span><span class="p">,</span><span class="n">input_scalings_dict</span><span class="p">[</span><span class="n">input_arg</span><span class="p">]),</span><span class="mi">0</span><span class="p">)</span>
+      <span class="k">else</span><span class="p">:</span>
+        <span class="n">input_scalings</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">input_scalings_</span><span class="p">)</span>
       <span class="c1"># Update initial layer weights</span>
       <span class="bp">self</span><span class="o">.</span><span class="n">input_scalings_</span><span class="p">[:]</span> <span class="o">=</span> <span class="n">input_scalings</span>
       <span class="bp">self</span><span class="o">.</span><span class="n">output_scalings_</span><span class="p">[:]</span> <span class="o">=</span> <span class="n">output_scaling</span>
@@ -1307,7 +1746,6 @@ v0.1.0 - Home"/>
     <span class="n">r6</span> <span class="o">=</span> <span class="n">LinearAffineMlp</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span>
 
     <span class="k">assert</span> <span class="n">np</span><span class="o">.</span><span class="n">allclose</span><span class="p">(</span> <span class="p">(</span><span class="n">r2</span><span class="o">+</span><span class="n">r3</span><span class="p">)</span><span class="o">.</span><span class="n">detach</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">(),</span><span class="n">r5</span><span class="o">.</span><span class="n">detach</span><span class="p">()</span><span class="o">.</span><span class="n">numpy</span><span class="p">())</span>
-
 </pre></div>
 
                 </article>

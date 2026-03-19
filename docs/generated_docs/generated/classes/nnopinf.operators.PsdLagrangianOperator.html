@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>nnopinf.operators.StandardOperator &#8212; NN-OpInf
+    <title>nnopinf.operators.PsdLagrangianOperator &#8212; NN-OpInf
 v0.1.0</title>
   
   
@@ -55,11 +55,11 @@ v0.1.0</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
     <script src="https://unpkg.com/@jupyter-widgets/html-manager@^0.20.0/dist/embed-amd.js"></script>
     <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
-    <script>DOCUMENTATION_OPTIONS.pagename = 'generated/classes/nnopinf.operators.StandardOperator';</script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'generated/classes/nnopinf.operators.PsdLagrangianOperator';</script>
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
-    <link rel="next" title="nnopinf.operators.SpdOperator" href="nnopinf.operators.SpdOperator.html" />
-    <link rel="prev" title="nnopinf.operators.Operator" href="nnopinf.operators.Operator.html" />
+    <link rel="next" title="nnopinf.operators.CompositeOperator" href="nnopinf.operators.CompositeOperator.html" />
+    <link rel="prev" title="nnopinf.operators.StandardLagrangianOperator" href="nnopinf.operators.StandardLagrangianOperator.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
   <meta name="docsearch:version" content="" />
@@ -266,12 +266,12 @@ v0.1.0 - Home"/>
   <div class="bd-toc-item navbar-nav"><ul class="current nav bd-sidenav">
 <li class="toctree-l1 current active has-children"><a class="reference internal" href="../../operators.html">Operators</a><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="nnopinf.operators.Operator.html">nnopinf.operators.Operator</a></li>
-<li class="toctree-l2 current active"><a class="current reference internal" href="#">nnopinf.operators.StandardOperator</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nnopinf.operators.StandardOperator.html">nnopinf.operators.StandardOperator</a></li>
 <li class="toctree-l2"><a class="reference internal" href="nnopinf.operators.SpdOperator.html">nnopinf.operators.SpdOperator</a></li>
 <li class="toctree-l2"><a class="reference internal" href="nnopinf.operators.SkewOperator.html">nnopinf.operators.SkewOperator</a></li>
 <li class="toctree-l2"><a class="reference internal" href="nnopinf.operators.MatrixOperator.html">nnopinf.operators.MatrixOperator</a></li>
 <li class="toctree-l2"><a class="reference internal" href="nnopinf.operators.StandardLagrangianOperator.html">nnopinf.operators.StandardLagrangianOperator</a></li>
-<li class="toctree-l2"><a class="reference internal" href="nnopinf.operators.PsdLagrangianOperator.html">nnopinf.operators.PsdLagrangianOperator</a></li>
+<li class="toctree-l2 current active"><a class="current reference internal" href="#">nnopinf.operators.PsdLagrangianOperator</a></li>
 <li class="toctree-l2"><a class="reference internal" href="nnopinf.operators.CompositeOperator.html">nnopinf.operators.CompositeOperator</a></li>
 <li class="toctree-l2"><a class="reference internal" href="nnopinf.operators.LinearAffineTensorOperator.html">nnopinf.operators.LinearAffineTensorOperator</a></li>
 <li class="toctree-l2"><a class="reference internal" href="nnopinf.operators.LinearAffineSkewTensorOperator.html">nnopinf.operators.LinearAffineSkewTensorOperator</a></li>
@@ -349,7 +349,7 @@ v0.1.0 - Home"/>
     
     <li class="breadcrumb-item"><a href="../../operators.html" class="nav-link">Operators</a></li>
     
-    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">nnopinf.operators.StandardOperator</span></li>
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">nnopinf.operators.PsdLagrangianOperator</span></li>
   </ul>
 </nav>
 </div>
@@ -366,66 +366,42 @@ v0.1.0 - Home"/>
 <div id="searchbox"></div>
                 <article class="bd-article">
                   
-  <section id="nnopinf-operators-standardoperator">
-<h1>nnopinf.operators.StandardOperator<a class="headerlink" href="#nnopinf-operators-standardoperator" title="Link to this heading">#</a></h1>
+  <section id="nnopinf-operators-psdlagrangianoperator">
+<h1>nnopinf.operators.PsdLagrangianOperator<a class="headerlink" href="#nnopinf-operators-psdlagrangianoperator" title="Link to this heading">#</a></h1>
 <dl class="py class">
-<dt class="sig sig-object py" id="nnopinf.operators.StandardOperator">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">nnopinf.operators.</span></span><span class="sig-name descname"><span class="pre">StandardOperator</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">n_outputs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">depends_on</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_hidden_layers</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_neurons_per_layer</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">activation=&lt;built-in</span> <span class="pre">method</span> <span class="pre">tanh</span> <span class="pre">of</span> <span class="pre">type</span> <span class="pre">object&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name='StandardOperator'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/nnopinf/operators.html#StandardOperator"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nnopinf.operators.StandardOperator" title="Link to this definition">#</a></dt>
+<dt class="sig sig-object py" id="nnopinf.operators.PsdLagrangianOperator">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">nnopinf.operators.</span></span><span class="sig-name descname"><span class="pre">PsdLagrangianOperator</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">acts_on</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">depends_on</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_hidden_layers</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_neurons_per_layer</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">activation=&lt;built-in</span> <span class="pre">method</span> <span class="pre">tanh</span> <span class="pre">of</span> <span class="pre">type</span> <span class="pre">object&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">positive=True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name='PsdLagrangianOperator'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/nnopinf/operators.html#PsdLagrangianOperator"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nnopinf.operators.PsdLagrangianOperator" title="Link to this definition">#</a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Module</span></code></p>
-<p><span class="math notranslate nohighlight">\(f: v \mapsto f(v)\)</span></p>
-<p>Constructs an operator <span class="math notranslate nohighlight">\(f: v \mapsto f(v),\)</span> with a dense neural network for <span class="math notranslate nohighlight">\(v \in \mathbb{R}^K\)</span>, and <span class="math notranslate nohighlight">\(f(v) \in \mathbb{R}^{M}\)</span>.</p>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<ul class="simple">
-<li><p>The output dimension does not need to match the input dimension.</p></li>
-<li><p>There is no “acts on” input as we are not inferring a matrix operator.</p></li>
-</ul>
-</div>
+<p><span class="math notranslate nohighlight">\(f: x \mapsto \nabla_x \mathcal{L}(x)\)</span> where
+<span class="math notranslate nohighlight">\(\mathcal{L}(x) = x^T A(x) x\)</span> and <span class="math notranslate nohighlight">\(A(x)\)</span> is an SPD operator.</p>
+<p>Constructs a Lagrangian operator whose internal scalar network is formed
+by an SPD operator acting on the state and then left-multiplied by the state.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>n_outputs</strong> (<em>int</em>) – Output dimension of the operator, i.e., <code class="docutils literal notranslate"><span class="pre">M</span></code> in the above description</p></li>
-<li><p><strong>depends_on</strong> (<em>tuple</em><em> of </em><a class="reference internal" href="nnopinf.Variable.html#nnopinf.Variable" title="nnopinf.Variable"><em>nnopinf.Variable</em></a>) – The variables the operator depends on, i.e., the <code class="docutils literal notranslate"><span class="pre">v</span></code> in <code class="docutils literal notranslate"><span class="pre">f(v)</span></code></p></li>
-<li><p><strong>n_hidden_layers</strong> (<em>int</em>) – Number of hidden layers in the network</p></li>
-<li><p><strong>n_neurons_per_layer</strong> (<em>int</em>) – Number of nuerons in each hidden layer</p></li>
+<li><p><strong>acts_on</strong> (<a class="reference internal" href="nnopinf.Variable.html#nnopinf.Variable" title="nnopinf.Variable"><em>nnopinf.Variable</em></a>) – The state the operator acts on, i.e., the <span class="math notranslate nohighlight">\(x\)</span>.</p></li>
+<li><p><strong>depends_on</strong> (<em>tuple</em><em> of </em><a class="reference internal" href="nnopinf.Variable.html#nnopinf.Variable" title="nnopinf.Variable"><em>nnopinf.Variable</em></a>) – The variables the operator depends on.</p></li>
+<li><p><strong>n_hidden_layers</strong> (<em>int</em>) – Number of hidden layers in the SPD network.</p></li>
+<li><p><strong>n_neurons_per_layer</strong> (<em>int</em>) – Number of neurons in each hidden layer.</p></li>
 <li><p><strong>activation</strong> (<em>PyTorch activation function</em><em> (</em><em>e.g.</em><em>, </em><em>torch.nn.functional.relu</em><em>)</em>) – Activation function used at each hidden layer.</p></li>
-<li><p><strong>name</strong> (<em>string</em>) – Operator name. Used when saving to file</p></li>
+<li><p><strong>positive</strong> (<em>bool</em>) – If operator is SPD or NPD.</p></li>
+<li><p><strong>name</strong> (<em>string</em>) – Operator name. Used when saving to file.</p></li>
 </ul>
 </dd>
 </dl>
-<p class="rubric">Examples</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">nnopinf</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">nnopinf.operators</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">x_input</span> <span class="o">=</span> <span class="n">nnopinf</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;x&quot;</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">mu_input</span> <span class="o">=</span> <span class="n">nnopinf</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;mu&quot;</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">StandardMlp</span> <span class="o">=</span> <span class="n">nnopinf</span><span class="o">.</span><span class="n">operators</span><span class="o">.</span><span class="n">StandardOperator</span><span class="p">(</span><span class="n">n_outputs</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span><span class="n">depends_on</span><span class="o">=</span><span class="p">(</span><span class="n">x_input</span><span class="p">,</span><span class="n">mu_input</span><span class="p">,),</span><span class="n">n_hidden_layers</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span><span class="n">n_neurons_per_layer</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
-</pre></div>
-</div>
 <dl class="py method">
-<dt class="sig sig-object py" id="nnopinf.operators.StandardOperator.forward">
-<span class="sig-name descname"><span class="pre">forward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">inputs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">return_jacobian</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/nnopinf/operators.html#StandardOperator.forward"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nnopinf.operators.StandardOperator.forward" title="Link to this definition">#</a></dt>
+<dt class="sig sig-object py" id="nnopinf.operators.PsdLagrangianOperator.forward">
+<span class="sig-name descname"><span class="pre">forward</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">inputs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">return_jacobian</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/nnopinf/operators.html#PsdLagrangianOperator.forward"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nnopinf.operators.PsdLagrangianOperator.forward" title="Link to this definition">#</a></dt>
 <dd><p>Forward pass of operator</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>inputs</strong> (<em>dict</em><em>(</em><em>str</em><em>, </em><em>np.array</em><em>)</em>) – Dictionary of input data in the form of arrays referenced by the variable name, i.e., inputs[‘x’] = np.ones(3)</p></li>
+<li><p><strong>inputs</strong> (<em>dict</em><em>(</em><em>str</em><em>, </em><em>np.array</em><em>)</em>) – Dictionary of input data in the form of arrays referenced by the
+variable name, i.e., inputs[‘x’] = np.ones(3)</p></li>
 <li><p><strong>return_jacobian</strong> (<em>bool</em><em>, </em><em>optional</em>) – If True, return the (approximate) Jacobian in addition to the output.</p></li>
 </ul>
 </dd>
 </dl>
-<p class="rubric">Examples</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">nnopinf</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">nnopinf.operators</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">x_input</span> <span class="o">=</span> <span class="n">nnopinf</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;x&quot;</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">mu_input</span> <span class="o">=</span> <span class="n">nnopinf</span><span class="o">.</span><span class="n">Variable</span><span class="p">(</span><span class="n">size</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;mu&quot;</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">StandardMlp</span> <span class="o">=</span> <span class="n">nnopinf</span><span class="o">.</span><span class="n">operators</span><span class="o">.</span><span class="n">StandardOperator</span><span class="p">(</span><span class="n">n_outputs</span> <span class="o">=</span> <span class="mi">5</span><span class="p">,</span><span class="n">depends_on</span><span class="o">=</span><span class="p">(</span><span class="n">x_input</span><span class="p">,</span><span class="n">mu_input</span><span class="p">,),</span><span class="n">n_hidden_layers</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span><span class="n">n_neurons_per_layer</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">inputs</span> <span class="o">=</span> <span class="p">{}</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">inputs</span><span class="p">[</span><span class="s1">&#39;x&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">normal</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">inputs</span><span class="p">[</span><span class="s1">&#39;mu&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">normal</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">f</span> <span class="o">=</span> <span class="n">StandardMlp</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span><span class="n">inputs</span><span class="p">)</span>
-</pre></div>
-</div>
 </dd></dl>
 
 </dd></dl>
@@ -455,8 +431,8 @@ v0.1.0 - Home"/>
   </div>
   <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
     <ul class="visible nav section-nav flex-column">
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#nnopinf.operators.StandardOperator"><code class="docutils literal notranslate"><span class="pre">StandardOperator</span></code></a><ul class="nav section-nav flex-column">
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nnopinf.operators.StandardOperator.forward"><code class="docutils literal notranslate"><span class="pre">StandardOperator.forward()</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#nnopinf.operators.PsdLagrangianOperator"><code class="docutils literal notranslate"><span class="pre">PsdLagrangianOperator</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nnopinf.operators.PsdLagrangianOperator.forward"><code class="docutils literal notranslate"><span class="pre">PsdLagrangianOperator.forward()</span></code></a></li>
 </ul>
 </li>
 </ul>
@@ -465,7 +441,7 @@ v0.1.0 - Home"/>
   <div class="sidebar-secondary-item">
 
   <div class="tocsection sourcelink">
-    <a href="../../_sources/generated/classes/nnopinf.operators.StandardOperator.rst.txt">
+    <a href="../../_sources/generated/classes/nnopinf.operators.PsdLagrangianOperator.rst.txt">
       <i class="fa-solid fa-file-lines"></i> Show Source
     </a>
   </div>

@@ -7,114 +7,12 @@ from typing import Protocol
 
 torch.set_default_dtype(torch.float64)
 
-def siren_activation(x):
-    return torch.sin(x)
-
-
-def _is_siren_activation(activation):
-    return activation is torch.sin or activation is siren_activation
-
-
-def _apply_activation(activation, z, omega_0):
-    if _is_siren_activation(activation):
-        return activation(omega_0 * z)
-    return activation(z)
-
-
-def _init_siren_layers(layers, omega_0):
-    for i, layer in enumerate(layers):
-        in_dim = layer.weight.shape[1]
-        if i == 0:
-            bound = 1.0 / in_dim
-        else:
-            bound = np.sqrt(6.0 / in_dim) / omega_0
-        nn.init.uniform_(layer.weight, -bound, bound)
-        if layer.bias is not None:
-            nn.init.uniform_(layer.bias, -bound, bound)
-
-
-def _siren_activation_for_layer(activation, omega_0, layer_index):
-    if _is_siren_activation(activation):
-        if layer_index == 0:
-            return lambda z: activation(omega_0 * z)
-        return activation
-    return activation
-
-
-def _init_siren_first_layer(layer, omega_0):
-    in_dim = layer.weight.shape[1]
-    bound = 1.0 / in_dim
-    nn.init.uniform_(layer.weight, -bound, bound)
-    if layer.bias is not None:
-        nn.init.uniform_(layer.bias, -bound, bound)
-
-
-def _augment_first_layer_with_siren(activation, omega_0, z):
-    return activation(z) + torch.sin(omega_0 * z)
-
-
-def _augment_tensor_with_fourier(x, freqs):
-    if freqs is None or freqs.numel() == 0:
-        return x
-    freqs = freqs.to(device=x.device, dtype=x.dtype)
-    x_exp = x.unsqueeze(-1) * freqs.view(1, 1, -1)
-    sin = torch.sin(x_exp).reshape(x.shape[0], -1)
-    cos = torch.cos(x_exp).reshape(x.shape[0], -1)
-    return torch.cat([x, sin, cos], dim=1)
-
 def inputs_to_tensor(inputs,names_to_collect):
     operator_inputs = []
     for input_name in names_to_collect:
       operator_inputs.append(inputs[input_name])
     if len(operator_inputs) == 0:
       return torch.zeros((0,0))
-    return torch.cat(operator_inputs, dim=1)
-
-def _fourier_frequencies(fourier_frequencies, num_frequencies, base, scale, device, dtype):
-    if fourier_frequencies is not None:
-        freqs = torch.as_tensor(fourier_frequencies, dtype=dtype, device=device)
-        return freqs
-    if num_frequencies <= 0:
-        return torch.zeros((0,), dtype=dtype, device=device)
-    freqs = scale * (base ** torch.arange(num_frequencies, dtype=dtype, device=device))
-    return freqs
-
-
-def _augmented_input_size(depends_on, fourier_variables, num_frequencies):
-    if not fourier_variables or num_frequencies <= 0:
-        return sum(var.get_size() for var in depends_on)
-    total = 0
-    for var in depends_on:
-        size = var.get_size()
-        total += size
-        if var.get_name() in fourier_variables:
-            total += size * 2 * num_frequencies
-    return total
-
-
-def _inputs_to_tensor_with_features(
-    inputs,
-    names_to_collect,
-    fourier_variables,
-    fourier_frequencies,
-    input_scalings_dict=None,
-):
-    operator_inputs = []
-    for input_name in names_to_collect:
-        x = inputs[input_name]
-        if input_scalings_dict is not None and input_name in input_scalings_dict:
-            x = x / input_scalings_dict[input_name]
-        if fourier_variables is not None and input_name in fourier_variables:
-            freqs = fourier_frequencies
-            if freqs is not None and freqs.numel() > 0:
-                freqs = freqs.to(device=x.device, dtype=x.dtype)
-                x_exp = x.unsqueeze(-1) * freqs.view(1, 1, -1)
-                sin = torch.sin(x_exp).reshape(x.shape[0], -1)
-                cos = torch.cos(x_exp).reshape(x.shape[0], -1)
-                x = torch.cat([x, sin, cos], dim=1)
-        operator_inputs.append(x)
-    if len(operator_inputs) == 0:
-        return torch.zeros((0, 0))
     return torch.cat(operator_inputs, dim=1)
 
 def create_layers(input_size,output_size,n_hidden_layers,n_neurons_per_layer):
@@ -276,31 +174,7 @@ class StandardOperator(nn.Module):
         Number of nuerons in each hidden layer
 
     activation : PyTorch activation function (e.g., torch.nn.functional.relu)
-        Activation function used at each layer
-
-    siren_omega_0 : float
-        Frequency scale for SIREN activations.
-
-    siren_first_layer : bool
-        If True, use a SIREN-style first layer even for non-sine activations.
-
-    fourier_features : bool
-        If True, augment inputs with Fourier features.
-
-    fourier_variables : iterable of str, optional
-        Variable names to augment with Fourier features. Defaults to all inputs.
-
-    fourier_num_frequencies : int
-        Number of frequencies per variable when using Fourier features.
-
-    fourier_base : float
-        Base for geometric progression of Fourier frequencies.
-
-    fourier_scale : float
-        Scaling applied to Fourier frequencies.
-
-    fourier_frequencies : array-like, optional
-        Explicit list of Fourier frequencies. Overrides ``fourier_num_frequencies``.
+        Activation function used at each hidden layer.
  
     name : string 
         Operator name. Used when saving to file 
@@ -314,7 +188,7 @@ class StandardOperator(nn.Module):
     >>> StandardMlp = nnopinf.operators.StandardOperator(n_outputs=5,depends_on=(x_input,mu_input,),n_hidden_layers=2,n_neurons_per_layer=2)
     """
 
-    def __init__(self,n_outputs,depends_on,n_hidden_layers,n_neurons_per_layer,activation=torch.tanh,siren_omega_0=30.0,siren_first_layer=False,fourier_features=False,fourier_variables=None,fourier_num_frequencies=2,fourier_base=2.0,fourier_scale=1.0,fourier_frequencies=None,name='StandardOperator'):
+    def __init__(self,n_outputs,depends_on,n_hidden_layers,n_neurons_per_layer,activation=torch.tanh,name='StandardOperator'):
         super(StandardOperator, self).__init__()
         self.name_ = name
         self.n_outputs_ = n_outputs 
@@ -326,41 +200,16 @@ class StandardOperator(nn.Module):
         self.num_hidden_layers = n_hidden_layers
         self.num_layers = self.num_hidden_layers + 1
 
-        freq_count = len(fourier_frequencies) if fourier_frequencies is not None else fourier_num_frequencies
-        n_inputs = _augmented_input_size(depends_on, set(fourier_variables) if fourier_variables is not None else set(self.depends_on_names_), freq_count) if fourier_features else sum(var.get_size() for var in depends_on)
-        self.n_inputs_ = n_inputs
+        self.n_inputs_ = sum(var.get_size() for var in depends_on)
         self.forward_list = create_layers(self.n_inputs_,network_output_size,n_hidden_layers,n_neurons_per_layer)
-        if _is_siren_activation(activation):
-          _init_siren_layers(self.forward_list, siren_omega_0)
-        elif siren_first_layer and len(self.forward_list) > 0:
-          _init_siren_first_layer(self.forward_list[0], siren_omega_0)
         self.activation = activation
-        self.activation_omega_0 = siren_omega_0
-        self.siren_first_layer_ = siren_first_layer
-        self.fourier_features_ = fourier_features
-        self.fourier_variables_ = set(fourier_variables) if fourier_variables is not None else set(self.depends_on_names_)
-        self.fourier_frequencies_ = _fourier_frequencies(
-            fourier_frequencies,
-            fourier_num_frequencies,
-            fourier_base,
-            fourier_scale,
-            device=torch.device('cpu'),
-            dtype=torch.float64,
-        )
-        self.input_scalings_dict_ = {}
         self.scalings_set_ = False
-        self.input_scaling_ = torch.ones(n_inputs)
+        self.input_scaling_ = torch.ones(self.n_inputs_)
         self.output_scaling_ = torch.ones(n_outputs)
 
     def _net(self,y):
       for i in range(0,self.num_layers-1):
-        if self.siren_first_layer_ and i == 0 and not _is_siren_activation(self.activation):
-          y = _augment_first_layer_with_siren(
-              self.activation, self.activation_omega_0, self.forward_list[i](y)
-          )
-        else:
-          act = _siren_activation_for_layer(self.activation, self.activation_omega_0, i)
-          y = act(self.forward_list[i](y))
+        y = self.activation(self.forward_list[i](y))
       return self.forward_list[-1](y)
 
     def forward(self,inputs,return_jacobian=False):
@@ -389,16 +238,7 @@ class StandardOperator(nn.Module):
       >>> f = StandardMlp.forward(inputs)
       """
 
-      if self.fourier_features_:
-        y = _inputs_to_tensor_with_features(
-            inputs,
-            self.depends_on_names_,
-            self.fourier_variables_,
-            self.fourier_frequencies_,
-            self.input_scalings_dict_ if self.scalings_set_ else None,
-        )
-      else:
-        y = inputs_to_tensor(inputs,self.depends_on_names_)
+      y = inputs_to_tensor(inputs,self.depends_on_names_)
       result = self._net(y)
       if return_jacobian:
         jac_list = []
@@ -419,20 +259,16 @@ class StandardOperator(nn.Module):
     def set_scalings(self,input_scalings_dict,output_scaling):
      with torch.no_grad():
       self.scalings_set_ = True
-      if self.fourier_features_:
-        self.input_scalings_dict_ = input_scalings_dict
       input_scalings = None
-      if not self.fourier_features_:
-        for input_arg in self.depends_on_names_:
-          if input_scalings is None:
-            input_scalings = input_scalings_dict[input_arg]
-          else:
-            input_scalings = torch.cat( (input_scalings,input_scalings_dict[input_arg]),0)
+      for input_arg in self.depends_on_names_:
+        if input_scalings is None:
+          input_scalings = input_scalings_dict[input_arg]
+        else:
+          input_scalings = torch.cat( (input_scalings,input_scalings_dict[input_arg]),0)
       
       # Update initial layer weights
-      if not self.fourier_features_:
-        initial_layer = self.forward_list[0]
-        initial_layer.weight[:] = initial_layer.weight[:] @ torch.eye(self.n_inputs_)/input_scalings
+      initial_layer = self.forward_list[0]
+      initial_layer.weight[:] = initial_layer.weight[:] @ torch.eye(self.n_inputs_)/input_scalings
        
       # Update final layer weights
       final_layer = self.forward_list[-1]
@@ -463,31 +299,7 @@ class SpdOperator(nn.Module):
         Number of nuerons in each hidden layer
 
     activation : PyTorch activation function (e.g., torch.nn.functional.relu)
-        Activation function used at each layer
- 
-    siren_omega_0 : float
-        Frequency scale for SIREN activations.
-
-    siren_first_layer : bool
-        If True, use a SIREN-style first layer even for non-sine activations.
-
-    fourier_features : bool
-        If True, augment inputs with Fourier features.
-
-    fourier_variables : iterable of str, optional
-        Variable names to augment with Fourier features. Defaults to all inputs.
-
-    fourier_num_frequencies : int
-        Number of frequencies per variable when using Fourier features.
-
-    fourier_base : float
-        Base for geometric progression of Fourier frequencies.
-
-    fourier_scale : float
-        Scaling applied to Fourier frequencies.
-
-    fourier_frequencies : array-like, optional
-        Explicit list of Fourier frequencies. Overrides ``fourier_num_frequencies``.
+        Activation function used at each hidden layer.
 
     positive : bool 
         If operator is SPD or NPD 
@@ -496,9 +308,6 @@ class SpdOperator(nn.Module):
         SPD parameterization. Supported values are ``"cholesky"`` (default, uses
         :math:`L L^T`) and ``"matrix_exp"`` (uses :math:`\\exp(S)` with symmetric
         :math:`S`).
-
-    residual : bool
-        If True, use residual connections between hidden layers when shapes match.
 
     layer_norm : bool
         If True, apply LayerNorm after each hidden linear layer.
@@ -522,18 +331,9 @@ class SpdOperator(nn.Module):
         n_hidden_layers,
         n_neurons_per_layer,
         activation=torch.tanh,
-        siren_omega_0=30.0,
-        siren_first_layer=False,
-        fourier_features=False,
-        fourier_variables=None,
-        fourier_num_frequencies=6,
-        fourier_base=2.0,
-        fourier_scale=1.0,
-        fourier_frequencies=None,
         positive=True,
         name='SpdOperator',
         parameterization='cholesky',
-        residual=True,
         layer_norm=True,
     ):
         super(SpdOperator, self).__init__()
@@ -553,44 +353,20 @@ class SpdOperator(nn.Module):
         if parameterization not in ('cholesky', 'matrix_exp'):
           raise ValueError("parameterization must be 'cholesky' or 'matrix_exp'")
         self.parameterization_ = parameterization
-        self.residual_ = residual
         self.layer_norm_ = layer_norm
-        self.activation_omega_0 = siren_omega_0
-        self.siren_first_layer_ = siren_first_layer
-        self.fourier_features_ = fourier_features
-        self.fourier_variables_ = set(fourier_variables) if fourier_variables is not None else set(self.depends_on_names_)
-        self.fourier_frequencies_ = _fourier_frequencies(
-            fourier_frequencies,
-            fourier_num_frequencies,
-            fourier_base,
-            fourier_scale,
-            device=torch.device('cpu'),
-            dtype=torch.float64,
-        )
-        self.input_scalings_dict_ = {}
         self.scalings_set_ = False
-        self.siren_first_layer_ = siren_first_layer
 
         network_output_size = idx[0].size
         self.num_hidden_layers = n_hidden_layers
         self.num_layers = self.num_hidden_layers + 1
 
-        freq_count = len(fourier_frequencies) if fourier_frequencies is not None else fourier_num_frequencies
-        self.n_inputs_ = _augmented_input_size(
-            depends_on,
-            set(fourier_variables) if fourier_variables is not None else set(self.depends_on_names_),
-            freq_count,
-        ) if fourier_features else sum(var.get_size() for var in depends_on)
+        self.n_inputs_ = sum(var.get_size() for var in depends_on)
 
         if self.positive_:
           self.scale_ = 1.0
         else:
           self.scale_ = -1.0
         self.forward_list = create_layers(self.n_inputs_,network_output_size,n_hidden_layers,n_neurons_per_layer)
-        if _is_siren_activation(activation):
-          _init_siren_layers(self.forward_list, siren_omega_0)
-        elif siren_first_layer and len(self.forward_list) > 0:
-          _init_siren_first_layer(self.forward_list[0], siren_omega_0)
         if self.layer_norm_:
           self.layer_norms_ = nn.ModuleList(
             [nn.LayerNorm(n_neurons_per_layer) for _ in range(self.num_layers-1)]
@@ -624,31 +400,12 @@ class SpdOperator(nn.Module):
       >>> Av,A = NpdMlp.forward(inputs,True)
       """
 
-      if self.fourier_features_:
-        y = _inputs_to_tensor_with_features(
-            inputs,
-            self.depends_on_names_,
-            self.fourier_variables_,
-            self.fourier_frequencies_,
-            self.input_scalings_dict_ if self.scalings_set_ else None,
-        )
-      else:
-        y = inputs_to_tensor(inputs,self.depends_on_names_)
+      y = inputs_to_tensor(inputs,self.depends_on_names_)
       for i in range(0,self.num_layers-1):
         z = self.forward_list[i](y)
         if self.layer_norm_:
           z = self.layer_norms_[i](z)
-        if self.siren_first_layer_ and i == 0 and not _is_siren_activation(self.activation):
-          z = _augment_first_layer_with_siren(
-              self.activation, self.activation_omega_0, z
-          )
-        else:
-          act = _siren_activation_for_layer(self.activation, self.activation_omega_0, i)
-          z = act(z)
-        if self.residual_ and z.shape == y.shape:
-          y = y + 0.05*z
-        else:
-          y = z
+        y = self.activation(z)
 
       y = self.forward_list[-1](y)
       K = torch.zeros(y.shape[0],self.n_outputs_,self.n_outputs_)
@@ -663,7 +420,7 @@ class SpdOperator(nn.Module):
       state = inputs[self.acts_on_name_] 
       state = torch.einsum('ij,nj->ni',self.scaling_mat_ , state)
       result = torch.einsum('ijk,ik->ij',K,state )
-      
+     
       if return_jacobian:
           jac = torch.einsum('ijk,kl->ijl',K,self.scaling_mat_)
           return result*self.scale_, jac*self.scale_
@@ -673,20 +430,16 @@ class SpdOperator(nn.Module):
     def set_scalings(self,input_scalings_dict,output_scaling):
      with torch.no_grad():
       self.scalings_set_ = True
-      if self.fourier_features_:
-        self.input_scalings_dict_ = input_scalings_dict
       input_scalings = None
-      if not self.fourier_features_:
-        for input_arg in self.depends_on_names_:
-          if input_scalings is None:
-            input_scalings = input_scalings_dict[input_arg]
-          else:
-            input_scalings = torch.cat( (input_scalings,input_scalings_dict[input_arg]),0)
+      for input_arg in self.depends_on_names_:
+        if input_scalings is None:
+          input_scalings = input_scalings_dict[input_arg]
+        else:
+          input_scalings = torch.cat( (input_scalings,input_scalings_dict[input_arg]),0)
       
       # Update initial layer weights
-      if not self.fourier_features_:
-        initial_layer = self.forward_list[0]
-        initial_layer.weight[:] = initial_layer.weight[:] @ torch.eye(self.n_inputs_)/input_scalings
+      initial_layer = self.forward_list[0]
+      initial_layer.weight[:] = initial_layer.weight[:] @ torch.eye(self.n_inputs_)/input_scalings
       self.scaling_mat_[:] = torch.eye(self.n_outputs_) / input_scalings_dict[self.acts_on_name_] * output_scaling
 
 
@@ -711,31 +464,7 @@ class SkewOperator(nn.Module):
         Number of nuerons in each hidden layer
 
     activation : PyTorch activation function (e.g., torch.nn.functional.relu)
-        Activation function used at each layer
-
-    siren_omega_0 : float
-        Frequency scale for SIREN activations.
-
-    siren_first_layer : bool
-        If True, use a SIREN-style first layer even for non-sine activations.
-
-    fourier_features : bool
-        If True, augment inputs with Fourier features.
-
-    fourier_variables : iterable of str, optional
-        Variable names to augment with Fourier features. Defaults to all inputs.
-
-    fourier_num_frequencies : int
-        Number of frequencies per variable when using Fourier features.
-
-    fourier_base : float
-        Base for geometric progression of Fourier frequencies.
-
-    fourier_scale : float
-        Scaling applied to Fourier frequencies.
-
-    fourier_frequencies : array-like, optional
-        Explicit list of Fourier frequencies. Overrides ``fourier_num_frequencies``.
+        Activation function used at each hidden layer.
  
     name : string 
         Operator name. Used when saving to file 
@@ -749,7 +478,7 @@ class SkewOperator(nn.Module):
     >>> SkewMlp = nnopinf.operators.SkewOperator(acts_on=x_input,depends_on=(x_input,mu_input,),n_hidden_layers=2,n_neurons_per_layer=2)
     """
 
-    def __init__(self,acts_on,depends_on,n_hidden_layers,n_neurons_per_layer,activation=torch.tanh, siren_omega_0=30.0, siren_first_layer=False, fourier_features=False, fourier_variables=None, fourier_num_frequencies=2, fourier_base=2.0, fourier_scale=1.0, fourier_frequencies=None, name='SkewOperator'):
+    def __init__(self,acts_on,depends_on,n_hidden_layers,n_neurons_per_layer,activation=torch.tanh,name='SkewOperator'):
         super(SkewOperator, self).__init__()
         self.name_ = name
         forward_list = []
@@ -769,32 +498,9 @@ class SkewOperator(nn.Module):
         self.num_layers = self.num_hidden_layers + 1
         self.scaling_mat_ = torch.eye(self.n_outputs_)
 
-        freq_count = len(fourier_frequencies) if fourier_frequencies is not None else fourier_num_frequencies
-        self.n_inputs_ = _augmented_input_size(
-            depends_on,
-            set(fourier_variables) if fourier_variables is not None else set(self.depends_on_names_),
-            freq_count,
-        ) if fourier_features else sum(var.get_size() for var in depends_on)
+        self.n_inputs_ = sum(var.get_size() for var in depends_on)
         self.forward_list = create_layers(self.n_inputs_,network_output_size,n_hidden_layers,n_neurons_per_layer)
-        if _is_siren_activation(activation):
-          _init_siren_layers(self.forward_list, siren_omega_0)
-        elif siren_first_layer and len(self.forward_list) > 0:
-          _init_siren_first_layer(self.forward_list[0], siren_omega_0)
-
         self.activation = activation
-        self.activation_omega_0 = siren_omega_0
-        self.siren_first_layer_ = siren_first_layer
-        self.fourier_features_ = fourier_features
-        self.fourier_variables_ = set(fourier_variables) if fourier_variables is not None else set(self.depends_on_names_)
-        self.fourier_frequencies_ = _fourier_frequencies(
-            fourier_frequencies,
-            fourier_num_frequencies,
-            fourier_base,
-            fourier_scale,
-            device=torch.device('cpu'),
-            dtype=torch.float64,
-        )
-        self.input_scalings_dict_ = {}
         self.scalings_set_ = False
         self.scaling_mat_ = torch.eye(self.n_outputs_)     
 
@@ -825,24 +531,9 @@ class SkewOperator(nn.Module):
       >>> Av,A = SkewMlp.forward(inputs,True)
       """
 
-      if self.fourier_features_:
-        y = _inputs_to_tensor_with_features(
-            inputs,
-            self.depends_on_names_,
-            self.fourier_variables_,
-            self.fourier_frequencies_,
-            self.input_scalings_dict_ if self.scalings_set_ else None,
-        )
-      else:
-        y = inputs_to_tensor(inputs,self.depends_on_names_)
+      y = inputs_to_tensor(inputs,self.depends_on_names_)
       for i in range(0,self.num_layers-1):
-        if self.siren_first_layer_ and i == 0 and not _is_siren_activation(self.activation):
-          y = _augment_first_layer_with_siren(
-              self.activation, self.activation_omega_0, self.forward_list[i](y)
-          )
-        else:
-          act = _siren_activation_for_layer(self.activation, self.activation_omega_0, i)
-          y = act(self.forward_list[i](y))
+        y = self.activation(self.forward_list[i](y))
 
       y = self.forward_list[-1](y)
 
@@ -866,20 +557,16 @@ class SkewOperator(nn.Module):
     def set_scalings(self,input_scalings_dict,output_scaling):
      with torch.no_grad():
       self.scalings_set_ = True
-      if self.fourier_features_:
-        self.input_scalings_dict_ = input_scalings_dict
       input_scalings = None
-      if not self.fourier_features_:
-        for input_arg in self.depends_on_names_:
-          if input_scalings is None:
-            input_scalings = input_scalings_dict[input_arg]
-          else:
-            input_scalings = torch.cat( (input_scalings,input_scalings_dict[input_arg]),0)
+      for input_arg in self.depends_on_names_:
+        if input_scalings is None:
+          input_scalings = input_scalings_dict[input_arg]
+        else:
+          input_scalings = torch.cat( (input_scalings,input_scalings_dict[input_arg]),0)
       
       # Update initial layer weights
-      if not self.fourier_features_:
-        initial_layer = self.forward_list[0]
-        initial_layer.weight[:] = initial_layer.weight[:] @ torch.eye(self.n_inputs_)/input_scalings
+      initial_layer = self.forward_list[0]
+      initial_layer.weight[:] = initial_layer.weight[:] @ torch.eye(self.n_inputs_)/input_scalings
       self.scaling_mat_[:] = torch.eye(self.n_outputs_) / input_scalings_dict[self.acts_on_name_] * output_scaling
 
 
@@ -910,31 +597,7 @@ class MatrixOperator(nn.Module):
         Number of nuerons in each hidden layer
 
     activation : PyTorch activation function (e.g., torch.nn.functional.relu)
-        Activation function used at each layer
-
-    siren_omega_0 : float
-        Frequency scale for SIREN activations.
-
-    siren_first_layer : bool
-        If True, use a SIREN-style first layer even for non-sine activations.
-
-    fourier_features : bool
-        If True, augment inputs with Fourier features.
-
-    fourier_variables : iterable of str, optional
-        Variable names to augment with Fourier features. Defaults to all inputs.
-
-    fourier_num_frequencies : int
-        Number of frequencies per variable when using Fourier features.
-
-    fourier_base : float
-        Base for geometric progression of Fourier frequencies.
-
-    fourier_scale : float
-        Scaling applied to Fourier frequencies.
-
-    fourier_frequencies : array-like, optional
-        Explicit list of Fourier frequencies. Overrides ``fourier_num_frequencies``.
+        Activation function used at each hidden layer.
  
     name : string 
         Operator name. Used when saving to file 
@@ -948,7 +611,7 @@ class MatrixOperator(nn.Module):
     >>> MatrixMlp = nnopinf.operators.MatrixOperator(n_outputs=5,acts_on=x_input,depends_on=(x_input,mu_input,),n_hidden_layers=2,n_neurons_per_layer=2)
     """
 
-    def __init__(self,n_outputs,acts_on,depends_on,n_hidden_layers,n_neurons_per_layer,activation=torch.tanh, siren_omega_0=30.0, siren_first_layer=False, fourier_features=False, fourier_variables=None, fourier_num_frequencies=2, fourier_base=2.0, fourier_scale=1.0, fourier_frequencies=None, name='MatrixOperator'):
+    def __init__(self,n_outputs,acts_on,depends_on,n_hidden_layers,n_neurons_per_layer,activation=torch.tanh,name='MatrixOperator'):
         super(MatrixOperator, self).__init__()
         self.name_ = name
         self.n_outputs_ = n_outputs 
@@ -958,37 +621,13 @@ class MatrixOperator(nn.Module):
         for i in range(len(depends_on)):
           self.depends_on_names_.append(depends_on[i].get_name())
           self.n_inputs_ += depends_on[i].get_size()
-        freq_count = len(fourier_frequencies) if fourier_frequencies is not None else fourier_num_frequencies
-        if fourier_features:
-          self.n_inputs_ = _augmented_input_size(
-              depends_on,
-              set(fourier_variables) if fourier_variables is not None else set(self.depends_on_names_),
-              freq_count,
-          )
         network_output_size = acts_on.get_size() * self.n_outputs_ 
         self.acts_on_size_ = acts_on.get_size()
         self.num_hidden_layers = n_hidden_layers
         self.num_layers = self.num_hidden_layers + 1
 
         self.forward_list = create_layers(self.n_inputs_,network_output_size,n_hidden_layers,n_neurons_per_layer)
-        if _is_siren_activation(activation):
-          _init_siren_layers(self.forward_list, siren_omega_0)
-        elif siren_first_layer and len(self.forward_list) > 0:
-          _init_siren_first_layer(self.forward_list[0], siren_omega_0)
         self.activation = activation
-        self.activation_omega_0 = siren_omega_0
-        self.siren_first_layer_ = siren_first_layer
-        self.fourier_features_ = fourier_features
-        self.fourier_variables_ = set(fourier_variables) if fourier_variables is not None else set(self.depends_on_names_)
-        self.fourier_frequencies_ = _fourier_frequencies(
-            fourier_frequencies,
-            fourier_num_frequencies,
-            fourier_base,
-            fourier_scale,
-            device=torch.device('cpu'),
-            dtype=torch.float64,
-        )
-        self.input_scalings_dict_ = {}
         self.scalings_set_ = False
         self.scaling_mat_ = torch.eye(self.n_outputs_)
         self.scaling_mat2_ = torch.eye(self.n_outputs_)
@@ -1021,24 +660,9 @@ class MatrixOperator(nn.Module):
       >>> inputs['mu'] = np.random.normal(2)
       >>> Av,A = MatrixMlp.forward(inputs,True)
       """
-      if self.fourier_features_:
-        y = _inputs_to_tensor_with_features(
-            inputs,
-            self.depends_on_names_,
-            self.fourier_variables_,
-            self.fourier_frequencies_,
-            self.input_scalings_dict_ if self.scalings_set_ else None,
-        )
-      else:
-        y = inputs_to_tensor(inputs,self.depends_on_names_) 
+      y = inputs_to_tensor(inputs,self.depends_on_names_) 
       for i in range(0,self.num_layers-1):
-        if self.siren_first_layer_ and i == 0 and not _is_siren_activation(self.activation):
-          y = _augment_first_layer_with_siren(
-              self.activation, self.activation_omega_0, self.forward_list[i](y)
-          )
-        else:
-          act = _siren_activation_for_layer(self.activation, self.activation_omega_0, i)
-          y = act(self.forward_list[i](y))
+        y = self.activation(self.forward_list[i](y))
       y = self.forward_list[-1](y)
       A = torch.reshape(y,(y.shape[0],self.n_outputs_,self.acts_on_size_))
       A = torch.einsum('ij,njk->nik',self.scaling_mat_,A)
@@ -1055,20 +679,16 @@ class MatrixOperator(nn.Module):
     def set_scalings(self,input_scalings_dict,output_scaling):
      with torch.no_grad():
       self.scalings_set_ = True
-      if self.fourier_features_:
-        self.input_scalings_dict_ = input_scalings_dict
       input_scalings = None
-      if not self.fourier_features_:
-        for input_arg in self.depends_on_names_:
-          if input_scalings is None:
-            input_scalings = input_scalings_dict[input_arg]
-          else:
-            input_scalings = torch.cat( (input_scalings,input_scalings_dict[input_arg]),0)
+      for input_arg in self.depends_on_names_:
+        if input_scalings is None:
+          input_scalings = input_scalings_dict[input_arg]
+        else:
+          input_scalings = torch.cat( (input_scalings,input_scalings_dict[input_arg]),0)
       
       # Update initial layer weights
-      if not self.fourier_features_:
-        initial_layer = self.forward_list[0]
-        initial_layer.weight[:] = initial_layer.weight[:] @ torch.eye(self.n_inputs_)/input_scalings
+      initial_layer = self.forward_list[0]
+      initial_layer.weight[:] = initial_layer.weight[:] @ torch.eye(self.n_inputs_)/input_scalings
       # To do - make more efficient by editing weights
       #final_layer = self.forward_list[-1] 
       #final_layer.weight[:] =  ( torch.eye(self.n_outputs_) / input_scalings_dict[self.acts_on_name_] ) @ final_layer.weight[:] 
@@ -1163,37 +783,13 @@ class StandardLagrangianOperator(nn.Module):
         Number of neurons in each hidden layer.
 
     activation : PyTorch activation function (e.g., torch.tanh)
-        Activation function used at each layer.
-
-    siren_omega_0 : float
-        Frequency scale for SIREN activations.
-
-    siren_first_layer : bool
-        If True, use a SIREN-style first layer even for non-sine activations.
-
-    fourier_features : bool
-        If True, augment inputs with Fourier features.
-
-    fourier_variables : iterable of str, optional
-        Variable names to augment with Fourier features. Defaults to all inputs.
-
-    fourier_num_frequencies : int
-        Number of frequencies per variable when using Fourier features.
-
-    fourier_base : float
-        Base for geometric progression of Fourier frequencies.
-
-    fourier_scale : float
-        Scaling applied to Fourier frequencies.
-
-    fourier_frequencies : array-like, optional
-        Explicit list of Fourier frequencies. Overrides ``fourier_num_frequencies``.
+        Activation function used at each hidden layer.
 
     name : string
         Operator name. Used when saving to file.
     """
 
-    def __init__(self,n_outputs,depends_on,n_hidden_layers,n_neurons_per_layer,activation=torch.tanh, siren_omega_0=30.0, siren_first_layer=False, fourier_features=False, fourier_variables=None, fourier_num_frequencies=2, fourier_base=2.0, fourier_scale=1.0, fourier_frequencies=None, name="StandardLagrangianOperator"):
+    def __init__(self,n_outputs,depends_on,n_hidden_layers,n_neurons_per_layer,activation=torch.tanh,name="StandardLagrangianOperator"):
         super(StandardLagrangianOperator, self).__init__()
         self.name_ = name
         self.depends_on_names_ = []
@@ -1206,15 +802,7 @@ class StandardLagrangianOperator(nn.Module):
         assert n_outputs == self.input_size_, "n_outputs must match the input size"
 
         self.n_outputs_ = n_outputs
-        freq_count = len(fourier_frequencies) if fourier_frequencies is not None else fourier_num_frequencies
-        if fourier_features:
-          self.net_input_size_ = _augmented_input_size(
-              depends_on,
-              set(fourier_variables) if fourier_variables is not None else set(self.depends_on_names_),
-              freq_count,
-          )
-        else:
-          self.net_input_size_ = self.input_size_
+        self.net_input_size_ = self.input_size_
         self.num_hidden_layers = n_hidden_layers
         self.num_layers = self.num_hidden_layers + 1
 
@@ -1226,44 +814,19 @@ class StandardLagrangianOperator(nn.Module):
           bias = False if i == len(layer_dims) - 1 else True
           forward_list.append(nn.Linear(in_dim, out_dim, bias=bias))
         self.forward_list = nn.ModuleList(forward_list)
-        if _is_siren_activation(activation):
-          _init_siren_layers(self.forward_list, siren_omega_0)
-        elif siren_first_layer and len(self.forward_list) > 0:
-          _init_siren_first_layer(self.forward_list[0], siren_omega_0)
         self.activation = activation
-        self.activation_omega_0 = siren_omega_0
-        self.siren_first_layer_ = siren_first_layer
-        self.fourier_features_ = fourier_features
-        self.fourier_variables_ = set(fourier_variables) if fourier_variables is not None else set(self.depends_on_names_)
-        self.fourier_frequencies_ = _fourier_frequencies(
-            fourier_frequencies,
-            fourier_num_frequencies,
-            fourier_base,
-            fourier_scale,
-            device=torch.device('cpu'),
-            dtype=torch.float64,
-        )
-        self.input_scalings_dict_ = {}
 
         self.input_scalings_ = torch.ones(self.input_size_)
         self.output_scalings_ = torch.ones(self.n_outputs_)
         self.scalings_set_ = False
 
     def _build_features(self, x):
-        if self.fourier_features_ and self.depends_on_names_[0] in self.fourier_variables_:
-            return _augment_tensor_with_fourier(x, self.fourier_frequencies_)
         return x
 
     def _net(self,x_feat):
         y = x_feat
         for i in range(0,self.num_layers-1):
-          if self.siren_first_layer_ and i == 0 and not _is_siren_activation(self.activation):
-            y = _augment_first_layer_with_siren(
-                self.activation, self.activation_omega_0, self.forward_list[i](y)
-            )
-          else:
-            act = _siren_activation_for_layer(self.activation, self.activation_omega_0, i)
-            y = act(self.forward_list[i](y))
+          y = self.activation(self.forward_list[i](y))
         return self.forward_list[-1](y)
 
     def _grad(self,x):
@@ -1313,8 +876,6 @@ class StandardLagrangianOperator(nn.Module):
     def set_scalings(self,input_scalings_dict,output_scaling):
      with torch.no_grad():
       self.scalings_set_ = True
-      if self.fourier_features_:
-        self.input_scalings_dict_ = input_scalings_dict
       input_scalings = None
       for input_arg in self.depends_on_names_:
         if input_scalings is None:
@@ -1348,31 +909,7 @@ class PsdLagrangianOperator(nn.Module):
         Number of neurons in each hidden layer.
 
     activation : PyTorch activation function (e.g., torch.nn.functional.relu)
-        Activation function used at each layer.
-
-    siren_omega_0 : float
-        Frequency scale for SIREN activations.
-
-    siren_first_layer : bool
-        If True, use a SIREN-style first layer even for non-sine activations.
-
-    fourier_features : bool
-        If True, augment inputs with Fourier features.
-
-    fourier_variables : iterable of str, optional
-        Variable names to augment with Fourier features. Defaults to all inputs.
-
-    fourier_num_frequencies : int
-        Number of frequencies per variable when using Fourier features.
-
-    fourier_base : float
-        Base for geometric progression of Fourier frequencies.
-
-    fourier_scale : float
-        Scaling applied to Fourier frequencies.
-
-    fourier_frequencies : array-like, optional
-        Explicit list of Fourier frequencies. Overrides ``fourier_num_frequencies``.
+        Activation function used at each hidden layer.
 
     positive : bool
         If operator is SPD or NPD.
@@ -1388,14 +925,6 @@ class PsdLagrangianOperator(nn.Module):
         n_hidden_layers,
         n_neurons_per_layer,
         activation=torch.tanh,
-        siren_omega_0=30.0,
-        siren_first_layer=False,
-        fourier_features=False,
-        fourier_variables=None,
-        fourier_num_frequencies=2,
-        fourier_base=2.0,
-        fourier_scale=1.0,
-        fourier_frequencies=None,
         positive=True,
         name="PsdLagrangianOperator",
     ):
@@ -1416,17 +945,8 @@ class PsdLagrangianOperator(nn.Module):
             n_hidden_layers=n_hidden_layers,
             n_neurons_per_layer=n_neurons_per_layer,
             activation=activation,
-            siren_omega_0=siren_omega_0,
-            siren_first_layer=siren_first_layer,
-            fourier_features=fourier_features,
-            fourier_variables=fourier_variables,
-            fourier_num_frequencies=fourier_num_frequencies,
-            fourier_base=fourier_base,
-            fourier_scale=fourier_scale,
-            fourier_frequencies=fourier_frequencies,
             positive=positive,
             parameterization='cholesky',
-            residual=True,
             name=name + "_SpdOperator",
         )
 
