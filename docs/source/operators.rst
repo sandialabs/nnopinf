@@ -13,6 +13,8 @@ What distinguishes NN-OpInf is that we enforce structure on the inferred operato
 
 which enforces semi-positive-definiteness.
 
+The neural-network-backed operators in this module use standard dense multilayer perceptrons with a configurable activation function on the hidden layers.
+
 
 .. autosummary::
    :toctree: generated/classes

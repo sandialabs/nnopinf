@@ -33,8 +33,8 @@ v0.1.0</title>
 
     <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=a746c00c" />
     <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=949a1ff5" />
-    <link rel="stylesheet" type="text/css" href="../../_static/mystnb.4510f1fc1dee50b3e5859aac5469c37c29e427902b24a333a5f9fcb2f0b3ac41.css" />
-    <link rel="stylesheet" type="text/css" href="../../_static/jupyter-sphinx.css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/jupyter-sphinx.css?v=572af1d6" />
     <link rel="stylesheet" type="text/css" href="../../_static/thebelab.css" />
     <link rel="stylesheet" type="text/css" href="../../_static/custom.css" />
     <link rel="stylesheet" type="text/css" href="../../_static/sphinx-design.min.css?v=87e54e7c" />
@@ -58,12 +58,12 @@ v0.1.0</title>
     <script>DOCUMENTATION_OPTIONS.pagename = 'generated/classes/nnopinf.operators.MatrixOperator';</script>
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
-    <link rel="next" title="nnopinf.operators.CompositeOperator" href="nnopinf.operators.CompositeOperator.html" />
+    <link rel="next" title="nnopinf.operators.StandardLagrangianOperator" href="nnopinf.operators.StandardLagrangianOperator.html" />
     <link rel="prev" title="nnopinf.operators.SkewOperator" href="nnopinf.operators.SkewOperator.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
   <meta name="docsearch:version" content="" />
-    <meta name="docbuild:last-update" content="Dec 03, 2025"/>
+    <meta name="docbuild:last-update" content="Mar 19, 2026"/>
   </head>
   
   
@@ -147,9 +147,23 @@ v0.1.0 - Home"/>
 <nav>
   <ul class="bd-navbar-elements navbar-nav">
     
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../getting_started.html">
+    Getting Started
+  </a>
+</li>
+
+
 <li class="nav-item current active">
   <a class="nav-link nav-internal" href="../../api.html">
     API
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../examples.html">
+    Examples
   </a>
 </li>
 
@@ -214,9 +228,23 @@ v0.1.0 - Home"/>
 <nav>
   <ul class="bd-navbar-elements navbar-nav">
     
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../getting_started.html">
+    Getting Started
+  </a>
+</li>
+
+
 <li class="nav-item current active">
   <a class="nav-link nav-internal" href="../../api.html">
     API
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../examples.html">
+    Examples
   </a>
 </li>
 
@@ -242,6 +270,8 @@ v0.1.0 - Home"/>
 <li class="toctree-l2"><a class="reference internal" href="nnopinf.operators.SpdOperator.html">nnopinf.operators.SpdOperator</a></li>
 <li class="toctree-l2"><a class="reference internal" href="nnopinf.operators.SkewOperator.html">nnopinf.operators.SkewOperator</a></li>
 <li class="toctree-l2 current active"><a class="current reference internal" href="#">nnopinf.operators.MatrixOperator</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nnopinf.operators.StandardLagrangianOperator.html">nnopinf.operators.StandardLagrangianOperator</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nnopinf.operators.PsdLagrangianOperator.html">nnopinf.operators.PsdLagrangianOperator</a></li>
 <li class="toctree-l2"><a class="reference internal" href="nnopinf.operators.CompositeOperator.html">nnopinf.operators.CompositeOperator</a></li>
 <li class="toctree-l2"><a class="reference internal" href="nnopinf.operators.LinearAffineTensorOperator.html">nnopinf.operators.LinearAffineTensorOperator</a></li>
 <li class="toctree-l2"><a class="reference internal" href="nnopinf.operators.LinearAffineSkewTensorOperator.html">nnopinf.operators.LinearAffineSkewTensorOperator</a></li>
@@ -255,6 +285,27 @@ v0.1.0 - Home"/>
 </details></li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="../../models.html">Models</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="nnopinf.models.Model.html">nnopinf.models.Model</a></li>
+</ul><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../steppers.html">Steppers</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="nnopinf.steppers.BatchNewmarkExplicitStepper.html">nnopinf.steppers.BatchNewmarkExplicitStepper</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nnopinf.steppers.BatchNewmarkStepper.html">nnopinf.steppers.BatchNewmarkStepper</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nnopinf.steppers.NewmarkStepper.html">nnopinf.steppers.NewmarkStepper</a></li>
+</ul><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../training.html">Training</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../functions/nnopinf.training.get_default_settings.html">nnopinf.training.get_default_settings</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nnopinf.training.AbsNormalizer.html">nnopinf.training.AbsNormalizer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nnopinf.training.StandardNormalizer.html">nnopinf.training.StandardNormalizer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nnopinf.training.MaxAbsNormalizer.html">nnopinf.training.MaxAbsNormalizer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nnopinf.training.NoOpNormalizer.html">nnopinf.training.NoOpNormalizer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nnopinf.training.DataClass.html">nnopinf.training.DataClass</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../functions/nnopinf.training.bfgs_step.html">nnopinf.training.bfgs_step</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../functions/nnopinf.training.bfgs_step_batch_integrated.html">nnopinf.training.bfgs_step_batch_integrated</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../functions/nnopinf.training.split_and_normalize.html">nnopinf.training.split_and_normalize</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../functions/nnopinf.training.prepare_data.html">nnopinf.training.prepare_data</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../functions/nnopinf.training.optimize_weights.html">nnopinf.training.optimize_weights</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../functions/nnopinf.training.train.html">nnopinf.training.train</a></li>
 </ul><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary>
 </details></li>
 </ul>
@@ -319,7 +370,7 @@ v0.1.0 - Home"/>
 <h1>nnopinf.operators.MatrixOperator<a class="headerlink" href="#nnopinf-operators-matrixoperator" title="Link to this heading">#</a></h1>
 <dl class="py class">
 <dt class="sig sig-object py" id="nnopinf.operators.MatrixOperator">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">nnopinf.operators.</span></span><span class="sig-name descname"><span class="pre">MatrixOperator</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">n_outputs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">acts_on</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">depends_on</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_hidden_layers</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_neurons_per_layer</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">activation=&lt;function</span> <span class="pre">relu&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name='MatrixOperator'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/nnopinf/operators.html#MatrixOperator"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nnopinf.operators.MatrixOperator" title="Link to this definition">#</a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">nnopinf.operators.</span></span><span class="sig-name descname"><span class="pre">MatrixOperator</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">n_outputs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">acts_on</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">depends_on</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_hidden_layers</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_neurons_per_layer</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">activation=&lt;built-in</span> <span class="pre">method</span> <span class="pre">tanh</span> <span class="pre">of</span> <span class="pre">type</span> <span class="pre">object&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name='MatrixOperator'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/nnopinf/operators.html#MatrixOperator"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nnopinf.operators.MatrixOperator" title="Link to this definition">#</a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Module</span></code></p>
 <p><span class="math notranslate nohighlight">\(f: (v,x) \mapsto A(v)x\)</span></p>
 <p>Constructs an operator <span class="math notranslate nohighlight">\(f: A(v)x\)</span> for <span class="math notranslate nohighlight">\(x \in \mathbb{R}^K, v \in \mathbb{R}^{N}\)</span>, and <span class="math notranslate nohighlight">\(A \in \mathbb{R}^{M        imes K}\)</span>
@@ -332,7 +383,7 @@ Note that the Matrix <span class="math notranslate nohighlight">\(A\)</span> doe
 <li><p><strong>depends_on</strong> (<em>tuple</em><em> of </em><a class="reference internal" href="nnopinf.Variable.html#nnopinf.Variable" title="nnopinf.Variable"><em>nnopinf.Variable</em></a>) – The variables the operator depends on, i.e., the <span class="math notranslate nohighlight">\(v\)</span> in <span class="math notranslate nohighlight">\(A(v) x\)</span></p></li>
 <li><p><strong>n_hidden_layers</strong> (<em>int</em>) – Number of hidden layers in the network</p></li>
 <li><p><strong>n_neurons_per_layer</strong> (<em>int</em>) – Number of nuerons in each hidden layer</p></li>
-<li><p><strong>activation</strong> (<em>PyTorch activation function</em><em> (</em><em>e.g.</em><em>, </em><em>torch.nn.functional.relu</em><em>)</em>) – Activation function used at each layer</p></li>
+<li><p><strong>activation</strong> (<em>PyTorch activation function</em><em> (</em><em>e.g.</em><em>, </em><em>torch.nn.functional.relu</em><em>)</em>) – Activation function used at each hidden layer.</p></li>
 <li><p><strong>name</strong> (<em>string</em>) – Operator name. Used when saving to file</p></li>
 </ul>
 </dd>
@@ -353,7 +404,7 @@ Note that the Matrix <span class="math notranslate nohighlight">\(A\)</span> doe
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>inputs</strong> (<em>dict</em><em>(</em><em>str</em><em>, </em><em>np.array</em><em>)</em>) – Dictionary of input data in the form of arrays referenced by the variable name, i.e., inputs[‘x’] = np.ones(3)</p></li>
-<li><p><strong>return_jacobian</strong> (<em>bool</em>) – If the method returns the (approximate) Jacobian, A.</p></li>
+<li><p><strong>return_jacobian</strong> (<em>bool</em><em>, </em><em>optional</em>) – If True, return the (approximate) Jacobian in addition to the output.</p></li>
 </ul>
 </dd>
 </dl>
