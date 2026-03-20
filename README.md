@@ -11,7 +11,7 @@ systems that do not admit simple polynomial structure.
 - Operator and model abstractions for building learned reduced-order models
 - Structure-preserving operator classes (e.g., SPD, skew-symmetric, composite)
 - Training utilities with normalization, batching, and optimization settings
-- Steppers for time integration workflows
+- Beta stepper utilities for time integration workflows
 - End-to-end examples for advection and Burgers-style problems
 
 ## Installation
@@ -89,10 +89,18 @@ y = model.forward(inputs)
 
 ## Repository layout
 
-- `nnopinf/`: core library (operators, models, variables, steppers, training)
+- `nnopinf/`: core library
+  Stable components: operators, models, variables, training
+  Beta component: steppers
 - `examples/`: end-to-end workflows and saved model artifacts
 - `docs/`: Sphinx sources and generated HTML documentation
 - `test/`: unit tests for operators, models, variables, and training utilities
+
+## Beta Capabilities
+
+The `nnopinf.steppers` module should be treated as beta functionality.
+Its interfaces are still evolving and are less stable than the core operator,
+model, variable, and training APIs.
 
 ## Documentation
 

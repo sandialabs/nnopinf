@@ -1,5 +1,3 @@
-.. pydata-sphinx-theme::
-
 Models
 =============
 

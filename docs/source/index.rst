@@ -1,5 +1,3 @@
-.. pydata-sphinx-theme::
-
 NN-OpInf
 ============= 
 NN-OpInf is a PyTorch based approach to operator inference that utilizes composable, structure preserving neural networks to represent nonlinear operators. Operator inference, as made popular by `Peherstorfer, Willcox, and co-authors <https://willcox-research-group.github.io/rom-operator-inference-Python3/source/opinf/intro.html>`_, is an approach for inferring low-dimensional systems from data. Classically, OpInf infers polynomial models for the system dynamics. Numerous systems of interest, however, do not admit such polynomial structure. NN-OpInf addresses this challenge by parameterizing operators with neural networks.  
@@ -50,7 +48,7 @@ NN-OpInf is a PyTorch based approach to operator inference that utilizes composa
         </div>
         <div class="nnopinf-card">
             <h2><a href="api.html">API Reference</a></h2>
-            <p>Browse operators, models, steppers, and training utilities.</p>
+            <p>Browse stable operators, models, variables, training utilities, and beta stepper APIs.</p>
         </div>
         <div class="nnopinf-card">
             <h2><a href="examples.html">Examples</a></h2>

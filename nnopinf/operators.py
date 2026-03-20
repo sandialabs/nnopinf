@@ -49,7 +49,18 @@ class Operator(Protocol):
       """ 
 
     def set_scalings(self,input_scaling,output_scaling):
-      pass 
+      """
+      Apply input and output scaling factors to the operator parameters.
+
+      Parameters
+      ----------
+      input_scaling : dict
+          Mapping from variable name to the corresponding feature-wise input
+          scaling vector.
+
+      output_scaling : tensor-like
+          Feature-wise scaling vector for the operator output.
+      """
 
 
 class CompositeOperator(nn.Module):
@@ -97,6 +108,18 @@ class CompositeOperator(nn.Module):
             return result 
 
     def set_scalings(self,input_scaling,output_scaling):
+        """
+        Apply input and output scaling factors to each component operator.
+
+        Parameters
+        ----------
+        input_scaling : dict
+            Mapping from variable name to the corresponding feature-wise input
+            scaling vector.
+
+        output_scaling : tensor-like
+            Feature-wise scaling vector for the composite output.
+        """
         for operator in self.state_operators:
             operator.set_scalings(input_scaling,output_scaling)
 
@@ -142,6 +165,17 @@ class VectorOffsetOperator(nn.Module):
         return self.vec 
 
     def set_scalings(self,input_scalings_dict,output_scaling):
+       """
+       Apply the output scaling to the learned constant vector.
+
+       Parameters
+       ----------
+       input_scalings_dict : dict
+           Unused placeholder for API consistency with other operators.
+
+       output_scaling : tensor-like
+           Feature-wise scaling vector for the operator output.
+       """
        with torch.no_grad():
          self.vec[:] *= output_scaling
 
@@ -171,7 +205,7 @@ class StandardOperator(nn.Module):
         Number of hidden layers in the network 
 
     n_neurons_per_layer : int 
-        Number of nuerons in each hidden layer
+        Number of neurons in each hidden layer
 
     activation : PyTorch activation function (e.g., torch.nn.functional.relu)
         Activation function used at each hidden layer.
@@ -257,6 +291,18 @@ class StandardOperator(nn.Module):
 
 
     def set_scalings(self,input_scalings_dict,output_scaling):
+     """
+     Apply input and output scaling factors directly to the network weights.
+
+     Parameters
+     ----------
+     input_scalings_dict : dict
+         Mapping from variable name to the corresponding feature-wise input
+         scaling vector.
+
+     output_scaling : tensor-like
+         Feature-wise scaling vector for the operator output.
+     """
      with torch.no_grad():
       self.scalings_set_ = True
       input_scalings = None
@@ -287,7 +333,7 @@ class SpdOperator(nn.Module):
     Parameters
     ----------
     acts_on : nnopinf.Variable
-        The state the operators acts on, i.e., the ``x`` in ``A(v) x``
+        The state the operator acts on, i.e., the ``x`` in ``A(v) x``
 
     depends_on: tuple of nnopinf.Variable 
         The variables the operator depends on, i.e., the ``v`` in ``A(v) x``
@@ -296,7 +342,7 @@ class SpdOperator(nn.Module):
         Number of hidden layers in the network 
 
     n_neurons_per_layer : int 
-        Number of nuerons in each hidden layer
+        Number of neurons in each hidden layer
 
     activation : PyTorch activation function (e.g., torch.nn.functional.relu)
         Activation function used at each hidden layer.
@@ -428,6 +474,18 @@ class SpdOperator(nn.Module):
           return result*self.scale_
 
     def set_scalings(self,input_scalings_dict,output_scaling):
+     """
+     Apply input and output scaling factors to the SPD operator.
+
+     Parameters
+     ----------
+     input_scalings_dict : dict
+         Mapping from variable name to the corresponding feature-wise input
+         scaling vector.
+
+     output_scaling : tensor-like
+         Feature-wise scaling vector for the operator output.
+     """
      with torch.no_grad():
       self.scalings_set_ = True
       input_scalings = None
@@ -452,7 +510,7 @@ class SkewOperator(nn.Module):
     Parameters
     ----------
     acts_on : nnopinf.Variable
-        The state the operators acts on, i.e., the ``x`` in ``A(v) x``
+        The state the operator acts on, i.e., the ``x`` in ``A(v) x``
 
     depends_on: tuple of nnopinf.Variable 
         The variables the operator depends on, i.e., the ``v`` in ``A(v) x``
@@ -461,7 +519,7 @@ class SkewOperator(nn.Module):
         Number of hidden layers in the network 
 
     n_neurons_per_layer : int 
-        Number of nuerons in each hidden layer
+        Number of neurons in each hidden layer
 
     activation : PyTorch activation function (e.g., torch.nn.functional.relu)
         Activation function used at each hidden layer.
@@ -555,6 +613,18 @@ class SkewOperator(nn.Module):
 
 
     def set_scalings(self,input_scalings_dict,output_scaling):
+     """
+     Apply input and output scaling factors to the skew operator.
+
+     Parameters
+     ----------
+     input_scalings_dict : dict
+         Mapping from variable name to the corresponding feature-wise input
+         scaling vector.
+
+     output_scaling : tensor-like
+         Feature-wise scaling vector for the operator output.
+     """
      with torch.no_grad():
       self.scalings_set_ = True
       input_scalings = None
@@ -585,7 +655,7 @@ class MatrixOperator(nn.Module):
         Output dimension of the operator, i.e., ``M`` in the above description
 
     acts_on : nnopinf.Variable
-        The state the operators acts on, i.e., the :math:`x` in :math:`A(v) x`
+        The state the operator acts on, i.e., the :math:`x` in :math:`A(v) x`
 
     depends_on: tuple of nnopinf.Variable 
         The variables the operator depends on, i.e., the :math:`v` in :math:`A(v) x`
@@ -594,7 +664,7 @@ class MatrixOperator(nn.Module):
         Number of hidden layers in the network 
 
     n_neurons_per_layer : int 
-        Number of nuerons in each hidden layer
+        Number of neurons in each hidden layer
 
     activation : PyTorch activation function (e.g., torch.nn.functional.relu)
         Activation function used at each hidden layer.
@@ -677,6 +747,18 @@ class MatrixOperator(nn.Module):
           return result[:,:]
 
     def set_scalings(self,input_scalings_dict,output_scaling):
+     """
+     Apply input and output scaling factors to the matrix operator.
+
+     Parameters
+     ----------
+     input_scalings_dict : dict
+         Mapping from variable name to the corresponding feature-wise input
+         scaling vector.
+
+     output_scaling : tensor-like
+         Feature-wise scaling vector for the operator output.
+     """
      with torch.no_grad():
       self.scalings_set_ = True
       input_scalings = None
@@ -754,6 +836,18 @@ class QuadraticOperator(nn.Module):
           return result
 
     def set_scalings(self,input_scalings_dict,output_scaling):
+     """
+     Apply input and output scaling factors to the quadratic operator.
+
+     Parameters
+     ----------
+     input_scalings_dict : dict
+         Mapping from variable name to the corresponding feature-wise input
+         scaling vector.
+
+     output_scaling : tensor-like
+         Feature-wise scaling vector for the operator output.
+     """
      with torch.no_grad():
       self.scalings_set_ = True
       input_scalings = input_scalings_dict[self.acts_on_name_]
@@ -874,6 +968,18 @@ class StandardLagrangianOperator(nn.Module):
           return -grad[:,:]
 
     def set_scalings(self,input_scalings_dict,output_scaling):
+     """
+     Store input and output scaling factors for the Lagrangian operator.
+
+     Parameters
+     ----------
+     input_scalings_dict : dict
+         Mapping from variable name to the corresponding feature-wise input
+         scaling vector.
+
+     output_scaling : tensor-like
+         Feature-wise scaling vector for the operator output.
+     """
      with torch.no_grad():
       self.scalings_set_ = True
       input_scalings = None
@@ -1023,6 +1129,18 @@ class PsdLagrangianOperator(nn.Module):
             return grad[:, :]
 
     def set_scalings(self, input_scalings_dict, output_scaling):
+        """
+        Store input and output scaling factors for the PSD Lagrangian operator.
+
+        Parameters
+        ----------
+        input_scalings_dict : dict
+            Mapping from variable name to the corresponding feature-wise input
+            scaling vector.
+
+        output_scaling : tensor-like
+            Feature-wise scaling vector for the operator output.
+        """
         with torch.no_grad():
             self.scalings_set_ = True
             self.input_scalings_dict_ = {}
@@ -1046,7 +1164,7 @@ class LinearAffineTensorOperator(nn.Module):
         Output dimension of the operator, i.e., ``M`` in the above description
 
     acts_on : nnopinf.Variable
-        The state the operators acts on, i.e., the :math:`x`
+        The state the operator acts on, i.e., the :math:`x`
 
     depends_on: tuple of nnopinf.Variable 
         The affine variables the operator depends on, i.e., the :math:`v`
@@ -1104,6 +1222,18 @@ class LinearAffineTensorOperator(nn.Module):
 
 
     def set_scalings(self,input_scalings_dict,output_scaling):
+     """
+     Apply input and output scaling factors to the affine tensor operator.
+
+     Parameters
+     ----------
+     input_scalings_dict : dict
+         Mapping from variable name to the corresponding feature-wise input
+         scaling vector.
+
+     output_scaling : tensor-like
+         Feature-wise scaling vector for the operator output.
+     """
      with torch.no_grad():
       self.scalings_set_ = True
       if self.has_affine_inputs_:
@@ -1136,7 +1266,7 @@ class LinearAffineSkewTensorOperator(nn.Module):
     Parameters
     ----------
     acts_on : nnopinf.Variable
-        The state the operators acts on, i.e., the :math:`x`
+        The state the operator acts on, i.e., the :math:`x`
 
     depends_on: tuple of nnopinf.Variable 
         The affine variables the operator depends on, i.e., the :math:`v`
@@ -1220,6 +1350,18 @@ class LinearAffineSkewTensorOperator(nn.Module):
       return result[:,:]
 
     def set_scalings(self,input_scalings_dict,output_scaling):
+     """
+     Store input, state, and output scaling factors for the affine skew operator.
+
+     Parameters
+     ----------
+     input_scalings_dict : dict
+         Mapping from variable name to the corresponding feature-wise input
+         scaling vector.
+
+     output_scaling : tensor-like
+         Feature-wise scaling vector for the operator output.
+     """
      with torch.no_grad():
       self.scalings_set_ = True
       if self.has_affine_inputs_:
@@ -1245,13 +1387,13 @@ class LinearAffineSpdTensorOperator(nn.Module):
     Parameters
     ----------
     acts_on : nnopinf.Variable
-        The state the operators acts on, i.e., the :math:`x`
+        The state the operator acts on, i.e., the :math:`x`
 
     depends_on: tuple of nnopinf.Variable 
         The affine variables the operator depends on, i.e., the :math:`v`
 
     positive : bool
-        Constructs an SPD operator if true, and an NPD operator if flase 
+        Constructs an SPD operator if true, and an NPD operator if false.
 
     name : string 
         Operator name. Used when saving to file 
@@ -1330,6 +1472,18 @@ class LinearAffineSpdTensorOperator(nn.Module):
       return result[:,:]
 
     def set_scalings(self,input_scalings_dict,output_scaling):
+     """
+     Store input, state, and output scaling factors for the affine SPD operator.
+
+     Parameters
+     ----------
+     input_scalings_dict : dict
+         Mapping from variable name to the corresponding feature-wise input
+         scaling vector.
+
+     output_scaling : tensor-like
+         Feature-wise scaling vector for the operator output.
+     """
      with torch.no_grad():
       self.scalings_set_ = True
       if self.has_affine_inputs_:

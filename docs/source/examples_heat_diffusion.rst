@@ -1,5 +1,3 @@
-.. pydata-sphinx-theme::
-
 Transient Heat Diffusion Example
 ================================
 

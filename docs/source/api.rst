@@ -1,7 +1,8 @@
-.. pydata-sphinx-theme::
-
 API
 ============= 
+
+Stable API
+----------
 
 .. toctree::
     :maxdepth: 2
@@ -9,5 +10,12 @@ API
     operators 
     variables
     models
-    steppers
     training
+
+Beta API
+--------
+
+.. toctree::
+    :maxdepth: 2
+
+    steppers
