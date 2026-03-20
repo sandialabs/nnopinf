@@ -1,7 +1,5 @@
-.. pydata-sphinx-theme::
-
 Getting Started
-=============
+===============
 
 This guide walks through installation and a minimal training workflow.
 

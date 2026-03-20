@@ -1,3 +1,10 @@
+"""
+Beta time-integration utilities for NN-OpInf models.
+
+The stepper interfaces in this module are experimental and may change more
+frequently than the core operator, model, variable, and training APIs.
+"""
+
 import numpy as np
 import torch
 

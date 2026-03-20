@@ -1,7 +1,10 @@
-.. pydata-sphinx-theme::
-
 Steppers
 =============
+
+.. warning::
+
+   The ``nnopinf.steppers`` module is a beta capability. Its interfaces and
+   behavior may change more quickly than the core NN-OpInf APIs.
 
 Time integration utilities for advancing NN-OpInf models with Newmark
 schemes. These stepper classes manage state history and expose helpers for

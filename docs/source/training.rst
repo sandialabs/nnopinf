@@ -1,5 +1,3 @@
-.. pydata-sphinx-theme::
-
 Training
 =============
 
@@ -36,6 +34,8 @@ Trainers
    :template: class_template.rst
 
    nnopinf.training.DataClass
+   nnopinf.training.TrustRegionNewton
+   nnopinf.training.SR1Optimizer
 
 .. autosummary::
    :toctree: generated/functions

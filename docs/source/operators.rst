@@ -1,5 +1,3 @@
-.. pydata-sphinx-theme::
-
 Operators
 =============
 
@@ -26,6 +24,7 @@ The neural-network-backed operators in this module use standard dense multilayer
    nnopinf.operators.SpdOperator
    nnopinf.operators.SkewOperator
    nnopinf.operators.MatrixOperator
+   nnopinf.operators.QuadraticOperator
    nnopinf.operators.StandardLagrangianOperator
    nnopinf.operators.PsdLagrangianOperator
    nnopinf.operators.CompositeOperator

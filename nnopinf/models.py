@@ -10,7 +10,7 @@ torch.set_default_dtype(torch.float64)
 
 class Model(nn.Module):
     """
-    Test
+    Composite NN-OpInf model built from a list of operators.
     """
 
     def __init__(self,operators):
@@ -54,6 +54,18 @@ class Model(nn.Module):
           torch.save(operator,output_directory + '/' + operator.name_ + '.pt')
 
     def set_scalings(self,input_scalings_dict,output_scalings):
+        """
+        Apply input and output scaling factors to each operator in the model.
+
+        Parameters
+        ----------
+        input_scalings_dict : dict
+            Mapping from variable name to the corresponding feature-wise input
+            scaling vector.
+
+        output_scalings : tensor-like
+            Feature-wise scaling vector for the model output.
+        """
         self.scalings_set_ = True
         for i in range(0,len(self.operators_)):
             input_scalings = None
@@ -100,4 +112,3 @@ if __name__=='__main__':
 
     model.set_scalings(scalings)
     assert np.allclose( outputs.detach().numpy(),outputs_check.detach().numpy())
-
