@@ -195,20 +195,13 @@ These sources were inspected and packaged in the following environment on
 - CPython 3.13.15, built with Apple Clang 21.0.0.
 - pip 26.2.
 - macOS 26.6.2 (build 25G83), ARM64.
-- Python executable:
-  `/Users/ejparis/python_environments/standard/bin/python`.
 - NN-OpInf 0.1.0 from this repository.
 - Julia 1.12.7.
-- Norma.jl HEAD `601f1bea36d73cee8e67c2ab3c08cd4f162583ed`.
+- Patched Norma.jl HEAD `601f1bea36d73cee8e67c2ab3c08cd4f162583ed`.
 - Patched `normaopinf` base commit
   `cfc80bc9ccfa76bf4eaba939d1b300a682d63af3`.
 - `romtools` commit `1c93a49efebcdc73acf8009c3eeed89b237d81e9`.
 
-The observed checkouts were not clean, so their base hashes alone do not
-describe the solver used by the torsion example. The patches above capture the
-relevant tracked and new source changes. `NORMA_JL_ROOT` deliberately keeps
-the patched external solver location explicit rather than embedding a
-machine-specific path.
 
 ## Checks
 
