@@ -1,0 +1,47 @@
+output-directory: 'parametric-op-inf/'
+
+training-parameter-set-cardinality: 8
+testing-parameter-set-cardinality: 8
+parameter-training-file: 'params_parametric_opinf.dat' 
+parameter-testing-file:  'params_parametric_testing_opinf.dat'
+sample-corners: true
+integration: cn
+
+fom:
+  L: 1.
+  nx: 128
+  end-time: 2.
+  dt: 1.e-2
+  snapshot-collect-frequency: 1
+  fom-output-directory: fom/
+  integration: crank-nicolson 
+  
+machine-learning:
+  initial-seed: 0
+  reduced-basis-dimensions: [2,4,8,12,16]
+  training-stop-times: [2.0]
+  skip: 1
+  parameterized: true
+  optimizer: 'ADAM'
+  LBFGS-acceleration: true
+  model-types: ['OpInf-cA','OpInf-cAH','NNOPINF-NN','NNOPINF-SPD-f']
+  num-samples: 2
+  num-hidden-layers: 3 
+  num-epochs: 10000
+  batch-size: 50
+  learning-rate: 5.e-3
+  weight-decay: 1.e-6
+  lr-decay: 0.9998
+  print-training-output: true
+  training-output-directory: ml-models/
+
+roms:
+  reduced-basis-dimensions: [2,4,8,12,16]
+  training-stop-times: [2.0]
+  model-types: ['OpInf-cA','OpInf-cAH','NNOPINF-NN','NNOPINF-SPD-f']
+  rom-output-directory: roms/
+
+plots:
+  reduced-basis-dimensions: [2,4,8,12,16]
+  training-stop-times: [2.0]
+  model-types: ['OpInf-cA','OpInf-cAH','NNOPINF-NN','NNOPINF-SPD-f']

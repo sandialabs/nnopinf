@@ -1,0 +1,17 @@
+CSV output interval: 1.e-5
+CSV write sidesets: true
+Exodus output interval: 5.e-5
+mass matrix file: "mass.npz"
+initial conditions:
+  displacement: [{component: x, function: '0.0', node set: nsall}, {component: y, function: '0.0', node set: nsall}, {component: z, function: '0.0', node set: nsall}]
+  velocity: [{component: x, function: "a=7500; -a*y*z", node set: nsall}, {component: y, function: "a=7500; a*x*z", node set: nsall}, {component: z, function: '0.0', node set: nsall}]
+input mesh file: ../../../input/torsion.g
+model:
+  material: {blocks: {torsion: hyperelastic}, hyperelastic: {Poisson's ratio: 0.25, density: 1000.0, elastic modulus: 1000000000.0, model: neohookean}}
+  type: linear opinf rom
+  model-file: ../../../training/linear-opinf-operator-4.npz
+  basis inner product: mass
+output mesh file: torsion-linear.e
+solver: {absolute tolerance: 1.0e-06, maximum iterations: 128, minimum iterations: 1, relative tolerance: 1.0e-10, step: full Newton, type: Hessian minimizer}
+time integrator: {final time: 5.0e-3, initial time: 0.0, time step: 1.0e-05, type: Newmark, "\u03B2": 0.25, "\u03B3": 0.5}
+type: single

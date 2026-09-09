@@ -1,0 +1,51 @@
+output-directory: 'parametric-op-inf/'
+
+training-parameter-set-cardinality: 20
+testing-parameter-set-cardinality: 20
+parameter-training-file: 'params_parametric_opinf_training.dat' 
+parameter-testing-file:  'params_parametric_opinf_testing.dat'
+sample-corners: true
+
+fom:
+  L: 1.
+  nx: 100
+  ny: 100
+  end-time: 2.5
+  dt: 0.002
+  snapshot-collect-frequency: 1
+  fom-output-directory: fom/
+  integration: rk4
+
+machine-learning:
+  integration: rk4
+  optimizer: 'ADAM'
+  skip: 5
+  LBFGS-acceleration: true
+  reduced-basis-dimensions: [10,15,20,25]
+  training-stop-times: [2.5]
+  parameterized: true
+  model-types: ['OpInf-EP-cAH']
+  #model-types: ['ROM','OpInf-cA','OpInf-cAH','OpInf-EP-cAH','NNOPINF-NN','NNOPINF-PD-f']
+  num-samples: 2
+  num-hidden-layers: 3
+  num-epochs: 10000
+  batch-size: 50
+  learning-rate: 5.e-3
+  weight-decay: 1.e-6 
+  lr-decay: 0.9998
+  print-training-output: true
+  training-output-directory: ml-models/
+
+
+roms:
+  reduced-basis-dimensions: [10,15,20,25]
+  training-stop-times: [2.5]
+  model-types: ['OpInf-EP-cAH']
+  #model-types: ['ROM','OpInf-cA','OpInf-cAH','OpInf-EP-cAH','NNOPINF-NN','NNOPINF-PD-f']
+  rom-output-directory: roms/
+
+plots:
+  reduced-basis-dimensions: [10,15,20,25]
+  training-stop-times: [2.5]
+  model-types: ['ROM','OpInf-cA','OpInf-cAH','OpInf-EP-cAH','NNOPINF-NN','NNOPINF-PD-f']
+

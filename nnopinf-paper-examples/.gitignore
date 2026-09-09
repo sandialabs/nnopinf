@@ -1,0 +1,27 @@
+**/__pycache__/
+**/.pytest_cache/
+**/*.py[cod]
+**/*.swp
+**/.DS_Store
+
+# Generated experiment output.
+**/fom_snapshots_*.npz
+**/ml-models/
+**/roms/*.npz
+**/plots/
+**/renders/
+**/*-disp-*.csv
+**/*-velo-*.csv
+**/*-acce-*.csv
+**/*-time-*.csv
+**/*.e
+**/*.h5
+**/*.pt
+**/*.pth
+
+# Torsion model-training products and figures.
+torsion/training/linear-opinf-operator-*.npz
+torsion/training/quadratic-opinf-operator-*.npz
+torsion/training/*-models-*/
+torsion/postprocess/*.pdf
+torsion/postprocess/*.png

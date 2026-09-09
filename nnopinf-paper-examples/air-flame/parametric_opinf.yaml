@@ -1,0 +1,44 @@
+output-directory: 'parametric-op-inf/'
+
+parameter-training-file: 'params_parametric_opinf_training.dat' 
+parameter-testing-file:  'params_parametric_opinf_testing.dat'
+
+fom:
+  nx: 50 
+  ny: 25
+  end-time: 0.06 
+  dt: 1.0e-4 
+  snapshot-collect-frequency: 1
+  fom-output-directory: fom/
+
+
+machine-learning:
+  reduced-basis-dimensions: [5,10,15,20,40,60]
+  training-stop-times: [0.06]
+  model-types: ['OpInf-cA','OpInf-cAH','OpInf-EP-cAH','NNOPINF-NN','NNOPINF-PD-f']
+  optimizer: 'ADAM'
+  skip: 1
+  LBFGS-acceleration: true
+  num-samples: 2
+  num-hidden-layers: 3
+  parameterized: true
+  num-epochs: 10000
+  batch-size: 50
+  learning-rate: 5.e-3
+  weight-decay: 1.e-6
+  lr-decay: 0.9998
+  print-training-output: true
+  training-output-directory: ml-models/
+
+roms:
+  training-stop-times: [0.06]
+  reduced-basis-dimensions: [5,10,15,20,40,60]
+  rom-output-directory: roms/
+  model-types: ['OpInf-cA','OpInf-cAH','OpInf-EP-cAH','NNOPINF-NN','NNOPINF-PD-f']
+
+
+plots:
+  training-stop-times: [0.06]
+  reduced-basis-dimensions: [5,10,15,20,40,60]
+  model-types: ['OpInf-cA','OpInf-cAH','OpInf-EP-cAH','NNOPINF-NN','NNOPINF-PD-f']
+

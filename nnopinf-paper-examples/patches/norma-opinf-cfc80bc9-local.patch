@@ -1,0 +1,1099 @@
+diff --git a/README.md b/README.md
+index 5695912..0c3c152 100644
+--- a/README.md
++++ b/README.md
+@@ -54,6 +54,41 @@ This will launch the following GUI. From this GUI, you can both generate a train
+ 
+ ![Alt text](figs/opinf-gui.png "OpInf GUI")
+ 
++### Mass-weighted bases
++
++To construct and project onto a mass-orthonormal trial basis, point the
++optional `mass-file` setting at Norma's SciPy sparse NPZ output:
++
++```python
++settings["mass-file"] = "mass.npz"
++```
++
++The archive is loaded with `scipy.sparse.load_npz()` and remains sparse. It
++must contain the full \(3N \times 3N\) mass matrix in Norma's interleaved
++node-major ordering:
++
++```text
++[x1, y1, z1, x2, y2, z2, ..., xN, yN, zN]
++```
++
++Both free and constrained DOFs are expected.
++
++### Regularization searches
++
++The GUI supports automatic, shared-grid, and grouped-grid regularization.
++Candidate fields accept explicit comma-separated values or logarithmic ranges
++such as `logspace(-4, 1, 6)`.
++
++Grouped searches assign independent candidate grids to disjoint operator
++groups. For example, a cubic model can use groups `A`, `HG`, and `B`.
++The generated setting is passed directly to the backend:
++
++```python
++settings["regularization-parameter"] = {
++    "A": [1e-4, 1e-3], "HG": [1e-4, 1e-3], "B": [1e-2]
++}
++```
++
+ 
+ ##
+ 
+diff --git a/normaopinf/opinf/__init__.py b/normaopinf/opinf/__init__.py
+index fc3e51f..becf4a5 100644
+--- a/normaopinf/opinf/__init__.py
++++ b/normaopinf/opinf/__init__.py
+@@ -17,6 +17,11 @@ import normaopinf.readers
+ import normaopinf.calculus
+ import normaopinf.parser
+ import normaopinf.opinf.models as opinf_models
++from normaopinf.opinf._mass_matrix import (
++    SparseMatrixWeightedL2Orthogonalizer,
++    component_mass_blocks,
++    prepare_mass_matrix,
++)
+ 
+ 
+ # ANSI escape codes for bold and blue text
+@@ -806,7 +811,7 @@ def get_processed_snapshots(opinf_settings):
+   snapshots_dict['free_dofs'] = free_dofs
+   snapshots_dict['times'] = times
+   if "mass-file" in opinf_settings:
+-    snapshots_dict["mass_matrix"] = normaopinf.readers.read_mass_matrix_csv(
++    snapshots_dict["mass_matrix"] = normaopinf.readers.read_mass_matrix_npz(
+       opinf_settings["mass-file"]
+     )
+ 
+@@ -992,37 +997,19 @@ def make_opinf_model_from_snapshots_dict(snapshots_dict, opinf_settings):
+     snapshot_shape = np.shape(displacement_snapshots)
+     reshaped_snapshots = np.reshape(displacement_snapshots,(snapshot_shape[0],snapshot_shape[1],snapshot_shape[2]*snapshot_shape[3]) )
+     mass_matrix = snapshots_dict.get("mass_matrix")
+-    mass_matrix_dense = None
++    mass_matrix_component_major = None
+     if mass_matrix is not None:
+-        if hasattr(mass_matrix, "toarray"):
+-            mass_matrix_dense = mass_matrix.toarray()
+-        elif isinstance(mass_matrix, normaopinf.readers.COOData):
+-            mass_matrix_dense = np.zeros(mass_matrix.shape)
+-            for r, c, v in zip(mass_matrix.rows, mass_matrix.cols, mass_matrix.vals):
+-                mass_matrix_dense[r, c] = v
+-        else:
+-            mass_matrix_dense = mass_matrix
+         n_vars = displacement_snapshots.shape[0]
+         n_nodes = displacement_snapshots.shape[1]
+-        expected_size = n_vars * n_nodes
+-        if mass_matrix_dense.shape[0] == expected_size and mass_matrix_dense.shape[1] == expected_size:
+-            # Convert interleaved (node-major) mass matrix to component-major ordering.
+-            perm = np.empty(expected_size, dtype=int)
+-            for node in range(n_nodes):
+-                for var in range(n_vars):
+-                    comp_idx = var * n_nodes + node
+-                    inter_idx = node * n_vars + var
+-                    perm[comp_idx] = inter_idx
+-            mass_matrix_dense = mass_matrix_dense[np.ix_(perm, perm)]
+-            assert np.allclose(np.diag(mass_matrix_dense)[0:n_nodes],np.diag(mass_matrix_dense)[n_nodes:2*n_nodes])
+-
+-
++        mass_matrix_component_major = prepare_mass_matrix(
++            mass_matrix, n_vars, n_nodes
++        )
+ 
+     tspace_energy = np.zeros(0)
+     if opinf_settings['trial-space-splitting-type'] == "combined":
+-        if mass_matrix_dense is not None:
+-            orthogonalizer = romtools.vector_space.utils.EuclideanMatrixWeightedL2Orthogonalizer(
+-                mass_matrix_dense
++        if mass_matrix_component_major is not None:
++            orthogonalizer = SparseMatrixWeightedL2Orthogonalizer(
++                mass_matrix_component_major
+             )
+         else:
+             orthogonalizer = romtools.vector_space.utils.EuclideanL2Orthogonalizer()
+@@ -1038,18 +1025,19 @@ def make_opinf_model_from_snapshots_dict(snapshots_dict, opinf_settings):
+ 
+     elif opinf_settings['trial-space-splitting-type'] == 'split':
+         trial_spaces = []
+-        if mass_matrix_dense is not None:
+-            n_by_3 = int(mass_matrix_dense.shape[0] / 3)
+-            mass_matrix_single = mass_matrix_dense[0:n_by_3, 0:n_by_3]
++        mass_matrix_blocks = None
++        if mass_matrix_component_major is not None:
++            mass_matrix_blocks = component_mass_blocks(
++                mass_matrix_component_major, displacement_snapshots.shape[1]
++            )
++
+         for i in range(0,3):
+-            if mass_matrix_dense is not None:
+-                orthogonalizer = romtools.vector_space.utils.EuclideanMatrixWeightedL2Orthogonalizer(
+-                    mass_matrix_single
++            if mass_matrix_blocks is not None:
++                orthogonalizer = SparseMatrixWeightedL2Orthogonalizer(
++                    mass_matrix_blocks[i]
+                 )
+             else:
+                 orthogonalizer = romtools.vector_space.utils.EuclideanL2Orthogonalizer()
+-
+-        for i in range(0,3):
+             trial_space = romtools.VectorSpaceFromPOD(snapshots=reshaped_snapshots[i:i+1],
+                                             truncater=my_truncater,
+                                             shifter = None,
+@@ -1069,13 +1057,12 @@ def make_opinf_model_from_snapshots_dict(snapshots_dict, opinf_settings):
+         print('trial-space-splitting-type not found')
+ 
+ 
+-    if mass_matrix_dense is not None:
++    if mass_matrix_component_major is not None:
+         basis = trial_space.get_basis()
+         basis_matrix = basis.reshape(basis.shape[0] * basis.shape[1], basis.shape[2])
+-        gram = basis_matrix.T @ (mass_matrix_dense @ basis_matrix)
+-        assert np.allclose(
+-            gram, np.eye(gram.shape[0]), rtol=1e-6, atol=1e-6
+-        ), "Trial-space basis is not mass-orthonormal"
++        gram = basis_matrix.T @ (mass_matrix_component_major @ basis_matrix)
++        if not np.allclose(gram, np.eye(gram.shape[0]), rtol=1e-6, atol=1e-6):
++            raise ValueError("Trial-space basis is not mass-orthonormal")
+ 
+     # Project snapshots to ROM space
+     snapshot_shape = np.shape(displacement_snapshots)
+@@ -1083,10 +1070,10 @@ def make_opinf_model_from_snapshots_dict(snapshots_dict, opinf_settings):
+ 
+ 
+ 
+-    uhat = romtools.rom.optimal_l2_projection(reshaped_snapshots,trial_space)
+-    if mass_matrix_dense is not None:
++    if mass_matrix_component_major is not None:
+         uhat = romtools.rom.optimal_l2_projection(
+-            reshaped_snapshots, trial_space, weighting_matrix=mass_matrix_dense
++            reshaped_snapshots, trial_space,
++            weighting_matrix=mass_matrix_component_major
+         )
+     else:
+         uhat = romtools.rom.optimal_l2_projection(reshaped_snapshots, trial_space)
+@@ -1094,9 +1081,10 @@ def make_opinf_model_from_snapshots_dict(snapshots_dict, opinf_settings):
+ 
+     snapshot_shape = np.shape(velocity_snapshots)
+     reshaped_snapshots = np.reshape(velocity_snapshots,(snapshot_shape[0],snapshot_shape[1],snapshot_shape[2]*snapshot_shape[3]) )
+-    if mass_matrix_dense is not None:
++    if mass_matrix_component_major is not None:
+         uhat_dots = romtools.rom.optimal_l2_projection(
+-            reshaped_snapshots, trial_space, weighting_matrix=mass_matrix_dense
++            reshaped_snapshots, trial_space,
++            weighting_matrix=mass_matrix_component_major
+         )
+     else:
+         uhat_dots = romtools.rom.optimal_l2_projection(reshaped_snapshots, trial_space)
+@@ -1105,9 +1093,10 @@ def make_opinf_model_from_snapshots_dict(snapshots_dict, opinf_settings):
+     if opinf_settings['acceleration-computation-type'] == 'acceleration-snapshots':
+       snapshot_shape = np.shape(acceleration_snapshots)
+       reshaped_snapshots = np.reshape(acceleration_snapshots,(snapshot_shape[0],snapshot_shape[1],snapshot_shape[2]*snapshot_shape[3]) )
+-      if mass_matrix_dense is not None:
++      if mass_matrix_component_major is not None:
+         uhat_ddots = romtools.rom.optimal_l2_projection(
+-            reshaped_snapshots, trial_space, weighting_matrix=mass_matrix_dense
++            reshaped_snapshots, trial_space,
++            weighting_matrix=mass_matrix_component_major
+         )
+       else:
+         uhat_ddots = romtools.rom.optimal_l2_projection(reshaped_snapshots, trial_space)
+@@ -1117,9 +1106,10 @@ def make_opinf_model_from_snapshots_dict(snapshots_dict, opinf_settings):
+       u_ddots = normaopinf.calculus.d2dx2(displacement_snapshots,times,method='2nd-order-uniform-dx')
+       snapshot_shape = np.shape(u_ddots)
+       reshaped_snapshots = np.reshape(u_ddots,(snapshot_shape[0],snapshot_shape[1],snapshot_shape[2]*snapshot_shape[3]) )
+-      if mass_matrix_dense is not None:
++      if mass_matrix_component_major is not None:
+         uhat_ddots = romtools.rom.optimal_l2_projection(
+-            reshaped_snapshots, trial_space, weighting_matrix=mass_matrix_dense
++            reshaped_snapshots, trial_space,
++            weighting_matrix=mass_matrix_component_major
+         )
+       else:
+         uhat_ddots = romtools.rom.optimal_l2_projection(reshaped_snapshots, trial_space)
+diff --git a/normaopinf/opinf/app.py b/normaopinf/opinf/app.py
+index 5e9ac6f..22e3f22 100644
+--- a/normaopinf/opinf/app.py
++++ b/normaopinf/opinf/app.py
+@@ -2,6 +2,14 @@ import tkinter as tk
+ import nnopinf
+ import nnopinf.training
+ import normaopinf.opinf
++from normaopinf.opinf._regularization_gui import (
++    AUTOMATIC_MODE,
++    GROUPED_MODE,
++    SHARED_MODE,
++    build_regularization_setting,
++    default_groups,
++    search_combination_count,
++)
+ from tkinter import ttk, messagebox
+ import os
+ import subprocess  # For running the generated Python file
+@@ -77,6 +85,9 @@ def collect_settings():
+     settings = {}
+     settings['fom-yaml-file'] = fom_yaml_var.get()
+     settings['training-data-directories'] = [x for x in training_data_var.get().split(',')]
++    mass_file = mass_file_var.get().strip()
++    if mass_file:
++      settings['mass-file'] = mass_file
+     settings['model-type'] = model_type_var.get()
+     settings['stop-training-time'] = float(stop_training_time_var.get())
+     settings['training-skip-steps'] = int(training_skip_steps_var.get())
+@@ -84,12 +95,14 @@ def collect_settings():
+     settings['truncation-type'] = truncation_type_var.get()
+     settings['boundary-truncation-type'] = boundary_truncation_type_var.get()
+     
+-    # Parse the regularization parameter as a list of floats
+-    regularization_param_str = regularization_parameter_var.get()
+-    if regularization_param_str == 'automatic':
+-        settings['regularization-parameter'] = 'automatic'
+-    else:
+-        settings['regularization-parameter'] = [float(x) for x in regularization_param_str.split(',')]
++    group_specs = [
++        (row["group_var"].get(), row["candidate_var"].get())
++        for row in regularization_group_rows
++    ]
++    settings['regularization-parameter'] = build_regularization_setting(
++        regularization_mode_var.get(), regularization_parameter_var.get(),
++        group_specs, settings['model-type'], settings['forcing']
++    )
+     
+     # Collect additional settings
+     settings['model-name'] = model_name_var.get()
+@@ -143,9 +156,21 @@ def collect_settings():
+       settings['ensemble-size'] = int(ensemble_size_var.get())
+     return settings
+ 
+-# Function to run the generated Python file
++def generate_from_gui():
++    try:
++        settings = collect_settings()
++    except (TypeError, ValueError) as error:
++        messagebox.showerror("Invalid settings", str(error))
++        return
++    generate_python_file(settings, output_filename_var.get())
++
++
+ def run_python_file():
+-    settings = collect_settings()
++    try:
++        settings = collect_settings()
++    except (TypeError, ValueError) as error:
++        messagebox.showerror("Invalid settings", str(error))
++        return
+     output_filename = output_filename_var.get()
+     generate_python_file(settings, output_filename)
+     print('Executing ' + str(output_filename)) 
+@@ -246,6 +271,7 @@ frame.columnconfigure(1, weight=1)
+ # Define variables for the settings
+ fom_yaml_var = tk.StringVar(value="cuboid.yaml")
+ training_data_var = tk.StringVar(value=os.getcwd())
++mass_file_var = tk.StringVar(value='')
+ model_type_var = tk.StringVar(value='linear')
+ stop_training_time_var = tk.StringVar(value='1.e5')
+ training_skip_steps_var = tk.StringVar(value='1')
+@@ -253,6 +279,9 @@ forcing_var = tk.StringVar(value='False')
+ truncation_type_var = tk.StringVar(value='energy')
+ boundary_truncation_type_var = tk.StringVar(value='energy')
+ regularization_parameter_var = tk.StringVar(value='5.e-4, 5.e-3, 5.e-2')  # Example default value
++regularization_mode_var = tk.StringVar(value=SHARED_MODE)
++regularization_group_rows = []
++regularization_group_rows_initialized = False
+ model_name_var = tk.StringVar(value='opinf-operator')  # Default model name
+ truncation_value_var = tk.StringVar(value='0.999999')  # Default truncation value
+ boundary_truncation_value_var = tk.StringVar(value='0.999999')  # Default boundary truncation value
+@@ -340,10 +369,144 @@ boundary_truncation_value_entry = ttk.Entry(frame, textvariable=boundary_truncat
+ boundary_truncation_value_entry.grid(row=12, column=1, padx=5, pady=5)
+ #ToolTip(boundary_truncation_value_entry, "Enter the boundary truncation value as a float.")
+ 
+-ttk.Label(frame, text="Regularization Parameter(s) (comma-separated):").grid(row=13, column=0, sticky=tk.W)
+-regularization_parameter_entry = ttk.Entry(frame, textvariable=regularization_parameter_var, width=32)
+-regularization_parameter_entry.grid(row=13, column=1, padx=5, pady=5)
+-#ToolTip(regularization_parameter_entry, "Enter regularization parameters as a comma-separated list.")
++def _update_regularization_count(*_args):
++    group_specs = [
++        (row["group_var"].get(), row["candidate_var"].get())
++        for row in regularization_group_rows
++    ]
++    try:
++        setting = build_regularization_setting(
++            regularization_mode_var.get(),
++            regularization_parameter_var.get(),
++            group_specs,
++            model_type_var.get(),
++            forcing_var.get() == "True",
++        )
++        count = search_combination_count(setting)
++        regularization_count_var.set(f"Search combinations: {count}")
++    except (TypeError, ValueError):
++        regularization_count_var.set("Search combinations: —")
++
++
++def _relayout_regularization_rows():
++    for row_index, row in enumerate(regularization_group_rows, start=1):
++        row["group_entry"].grid(row=row_index, column=0, padx=(0, 4), pady=2)
++        row["candidate_entry"].grid(row=row_index, column=1, padx=4, pady=2)
++        row["remove_button"].grid(row=row_index, column=2, padx=(4, 0), pady=2)
++
++
++def _remove_regularization_group(row):
++    for widget_name in ("group_entry", "candidate_entry", "remove_button"):
++        row[widget_name].destroy()
++    regularization_group_rows.remove(row)
++    _relayout_regularization_rows()
++    _update_regularization_count()
++
++
++def _add_regularization_group(group="", candidate_spec=None):
++    if candidate_spec is None:
++        candidate_spec = regularization_parameter_var.get()
++    row = {
++        "group_var": tk.StringVar(value=group),
++        "candidate_var": tk.StringVar(value=candidate_spec),
++    }
++    row["group_entry"] = ttk.Entry(
++        regularization_group_container, textvariable=row["group_var"], width=6
++    )
++    row["candidate_entry"] = ttk.Entry(
++        regularization_group_container,
++        textvariable=row["candidate_var"],
++        width=23,
++    )
++    row["remove_button"] = ttk.Button(
++        regularization_group_container,
++        text="Remove",
++        command=lambda: _remove_regularization_group(row),
++    )
++    row["group_var"].trace_add("write", _update_regularization_count)
++    row["candidate_var"].trace_add("write", _update_regularization_count)
++    regularization_group_rows.append(row)
++    _relayout_regularization_rows()
++    _update_regularization_count()
++
++
++def _initialize_regularization_groups():
++    global regularization_group_rows_initialized
++    if regularization_group_rows_initialized:
++        return
++    regularization_group_rows_initialized = True
++    try:
++        groups = default_groups(
++            model_type_var.get(), forcing_var.get() == "True"
++        )
++    except ValueError:
++        groups = []
++    for group in groups:
++        _add_regularization_group(group)
++
++
++def _update_regularization_controls(*_args):
++    mode = regularization_mode_var.get()
++    if mode == SHARED_MODE:
++        regularization_parameter_entry.grid()
++        regularization_group_container.grid_remove()
++        add_regularization_group_button.grid_remove()
++    elif mode == AUTOMATIC_MODE:
++        regularization_parameter_entry.grid_remove()
++        regularization_group_container.grid_remove()
++        add_regularization_group_button.grid_remove()
++    else:
++        _initialize_regularization_groups()
++        regularization_parameter_entry.grid_remove()
++        regularization_group_container.grid()
++        add_regularization_group_button.grid()
++    _update_regularization_count()
++
++
++ttk.Label(frame, text="Regularization Search:").grid(
++    row=13, column=0, sticky=(tk.N, tk.W)
++)
++regularization_controls = ttk.Frame(frame, style="Card.TFrame")
++regularization_controls.grid(row=13, column=1, padx=5, pady=5, sticky=tk.W)
++regularization_mode_combo = ttk.Combobox(
++    regularization_controls,
++    textvariable=regularization_mode_var,
++    values=[SHARED_MODE, AUTOMATIC_MODE, GROUPED_MODE],
++    state="readonly",
++    width=29,
++)
++regularization_mode_combo.grid(row=0, column=0, columnspan=3, sticky=tk.W)
++regularization_parameter_entry = ttk.Entry(
++    regularization_controls, textvariable=regularization_parameter_var, width=32
++)
++regularization_parameter_entry.grid(row=1, column=0, columnspan=3, pady=(4, 0))
++ToolTip(
++    regularization_parameter_entry,
++    "Comma-separated values or logspace(start exponent, stop exponent, count).",
++)
++
++regularization_group_container = ttk.Frame(
++    regularization_controls, style="Card.TFrame"
++)
++regularization_group_container.grid(row=2, column=0, columnspan=3, pady=(4, 0))
++ttk.Label(regularization_group_container, text="Group").grid(row=0, column=0)
++ttk.Label(regularization_group_container, text="Candidates").grid(row=0, column=1)
++add_regularization_group_button = ttk.Button(
++    regularization_controls,
++    text="Add group",
++    command=_add_regularization_group,
++)
++add_regularization_group_button.grid(row=3, column=0, pady=(4, 0), sticky=tk.W)
++regularization_count_var = tk.StringVar(value="Search combinations: —")
++ttk.Label(regularization_controls, textvariable=regularization_count_var).grid(
++    row=3, column=1, columnspan=2, padx=(8, 0), pady=(4, 0), sticky=tk.W
++)
++
++regularization_mode_var.trace_add("write", _update_regularization_controls)
++regularization_parameter_var.trace_add("write", _update_regularization_count)
++model_type_var.trace_add("write", _update_regularization_count)
++forcing_var.trace_add("write", _update_regularization_count)
++_update_regularization_controls()
+ 
+ ttk.Label(frame, text="Model Name:\n(Enter the name of the model)").grid(row=14, column=0, sticky=tk.W)
+ model_name_entry = ttk.Entry(frame, textvariable=model_name_var, width=32)
+@@ -453,13 +616,23 @@ output_path_var = tk.StringVar(value='ml-models')  # Default value
+ output_path_entry = ttk.Entry(frame, textvariable=output_path_var, width=32)
+ output_path_entry.grid(row=row_no, column=1, padx=5, pady=5)
+ 
++row_no += 1
++ttk.Separator(frame).grid(
++    row=row_no, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=10
++)
++row_no += 1
++ttk.Label(frame, text="Mass Matrix File (optional):").grid(row=row_no, column=0, sticky=tk.W)
++mass_file_entry = ttk.Entry(frame, textvariable=mass_file_var, width=32)
++mass_file_entry.grid(row=row_no, column=1, padx=5, pady=5)
++ToolTip(mass_file_entry, "Path to Norma's SciPy sparse mass-matrix NPZ file.")
++
+ row_no += 1
+ # Create buttons to generate the Python file
+ generate_button = ttk.Button(
+     frame,
+     text="Generate Python File",
+     style="Accent.TButton",
+-    command=lambda: generate_python_file(collect_settings(), output_filename_var.get()),
++    command=generate_from_gui,
+ )
+ generate_button.grid(row=row_no, column=0, columnspan=2, pady=10)
+ 
+diff --git a/normaopinf/readers.py b/normaopinf/readers.py
+index 06297d6..16f5a99 100644
+--- a/normaopinf/readers.py
++++ b/normaopinf/readers.py
+@@ -1,5 +1,38 @@
+ import os
+ import numpy as np
++from scipy import sparse
++
++
++def read_mass_matrix_npz(path: str) -> sparse.csc_matrix:
++    """Load a Norma full-order mass matrix from a SciPy sparse NPZ file.
++
++    Norma writes the matrix in interleaved, node-major DOF ordering. This
++    reader intentionally preserves that ordering; the OpInf workflow performs
++    its ordering conversion once the number of snapshot variables and nodes is
++    known.
++    """
++    mass_matrix = sparse.load_npz(path).tocsc(copy=False)
++    if mass_matrix.shape[0] != mass_matrix.shape[1]:
++        raise ValueError(
++            f"Mass matrix must be square, got shape {mass_matrix.shape}"
++        )
++    if mass_matrix.shape[0] % 3 != 0:
++        raise ValueError(
++            "Mass matrix dimension must be divisible by three for x/y/z DOFs, "
++            f"got shape {mass_matrix.shape}"
++        )
++    if not np.issubdtype(mass_matrix.dtype, np.number):
++        raise ValueError(
++            f"Mass matrix must contain numeric values, got {mass_matrix.dtype}"
++        )
++    if not np.all(np.isfinite(mass_matrix.data)):
++        raise ValueError("Mass matrix contains non-finite values")
++
++    mass_matrix.eliminate_zeros()
++    mass_matrix.sort_indices()
++    return mass_matrix
++
++
+ def get_timestamp_str(filename):
+   # Naming convenction is 01-time-xxx.csv
+   #Split at the ".csv" and grab bit before the .
+diff --git a/normaopinf/opinf/_mass_matrix.py b/normaopinf/opinf/_mass_matrix.py
+new file mode 100644
+index 0000000..b4b0e9a
+--- /dev/null
++++ b/normaopinf/opinf/_mass_matrix.py
+@@ -0,0 +1,120 @@
++"""Sparse mass-matrix helpers for the OpInf offline workflow."""
++
++import numpy as np
++import scipy.linalg
++from scipy import sparse
++
++
++_MASS_RTOL = 1.0e-10
++_MASS_ATOL = 1.0e-12
++
++
++def _max_abs(matrix):
++    if matrix.nnz == 0:
++        return 0.0
++    return float(np.max(np.abs(matrix.data)))
++
++
++def _check_near_zero(matrix, scale, description):
++    error = _max_abs(matrix)
++    tolerance = _MASS_ATOL + _MASS_RTOL * scale
++    if error > tolerance:
++        raise ValueError(
++            f"Mass matrix {description} is not numerically zero: "
++            f"maximum magnitude {error:.6e} exceeds tolerance {tolerance:.6e}"
++        )
++
++
++def prepare_mass_matrix(mass_matrix, n_vars, n_nodes):
++    """Validate and convert an interleaved mass matrix to component-major order."""
++    if not sparse.issparse(mass_matrix):
++        raise TypeError("Mass matrix must be a SciPy sparse matrix")
++    if n_vars != 3:
++        raise ValueError(
++            f"Mass weighting requires exactly three snapshot variables, got {n_vars}"
++        )
++
++    expected_size = n_vars * n_nodes
++    expected_shape = (expected_size, expected_size)
++    if mass_matrix.shape != expected_shape:
++        raise ValueError(
++            "Mass matrix shape does not match the displacement snapshots: "
++            f"expected {expected_shape}, got {mass_matrix.shape}"
++        )
++
++    mass_matrix = mass_matrix.tocsc(copy=False)
++    difference = mass_matrix - mass_matrix.T
++    difference.eliminate_zeros()
++    scale = max(1.0, _max_abs(mass_matrix))
++    _check_near_zero(difference, scale, "symmetry error")
++
++    # Snapshots reshape in component-major order, while Norma writes node-major
++    # interleaved DOFs [x1, y1, z1, x2, y2, z2, ...].
++    permutation = np.arange(expected_size).reshape(n_nodes, n_vars).T.ravel()
++    reordered = mass_matrix[permutation, :][:, permutation].tocsc()
++    reordered.eliminate_zeros()
++    reordered.sort_indices()
++    return reordered
++
++
++def component_mass_blocks(mass_matrix, n_nodes):
++    """Return Mxx, Myy, and Mzz after validating zero cross-component blocks."""
++    scale = max(1.0, _max_abs(mass_matrix))
++    blocks = []
++    for row_component in range(3):
++        row_start = row_component * n_nodes
++        row_stop = row_start + n_nodes
++        blocks.append(
++            mass_matrix[row_start:row_stop, row_start:row_stop].tocsc()
++        )
++        for column_component in range(3):
++            if row_component == column_component:
++                continue
++            column_start = column_component * n_nodes
++            column_stop = column_start + n_nodes
++            cross_block = mass_matrix[
++                row_start:row_stop, column_start:column_stop
++            ]
++            _check_near_zero(
++                cross_block,
++                scale,
++                f"cross-component block ({row_component}, {column_component})",
++            )
++    return tuple(blocks)
++
++
++class SparseMatrixWeightedL2Orthogonalizer:
++    """Make a dense basis orthonormal in a sparse SPD matrix inner product."""
++
++    def __init__(self, weighting_matrix):
++        if not sparse.issparse(weighting_matrix):
++            raise TypeError("Weighting matrix must be a SciPy sparse matrix")
++        if weighting_matrix.shape[0] != weighting_matrix.shape[1]:
++            raise ValueError(
++                f"Weighting matrix must be square, got {weighting_matrix.shape}"
++            )
++        self._weighting_matrix = weighting_matrix
++
++    def orthogonalize(self, array):
++        if array.shape[0] != self._weighting_matrix.shape[0]:
++            raise ValueError(
++                "Weighting matrix does not match basis size: "
++                f"{self._weighting_matrix.shape[0]} != {array.shape[0]}"
++            )
++
++        gram = np.asarray(array.T @ (self._weighting_matrix @ array))
++        gram = 0.5 * (gram + gram.T)
++        try:
++            factor = scipy.linalg.cholesky(gram, lower=True, check_finite=True)
++        except scipy.linalg.LinAlgError as error:
++            raise ValueError(
++                "Mass-weighted reduced Gram matrix is not positive definite"
++            ) from error
++
++        inverse_factor_transpose = scipy.linalg.solve_triangular(
++            factor.T,
++            np.eye(factor.shape[0]),
++            lower=False,
++            check_finite=True,
++        )
++        return array @ inverse_factor_transpose
+diff --git a/normaopinf/opinf/_regularization_gui.py b/normaopinf/opinf/_regularization_gui.py
+new file mode 100644
+index 0000000..8731be1
+--- /dev/null
++++ b/normaopinf/opinf/_regularization_gui.py
+@@ -0,0 +1,161 @@
++"""Parsing and validation helpers for GUI regularization settings."""
++
++import math
++import re
++
++import numpy as np
++
++
++AUTOMATIC_MODE = "Automatic"
++SHARED_MODE = "Shared grid"
++GROUPED_MODE = "Grouped grid"
++
++_SUPPORTED_OPERATORS = set("cAHGB")
++_MODEL_OPERATORS = {
++    "linear": set("AB"),
++    "linear-symmetric": set("AB"),
++    "quadratic": set("AHB"),
++    "cubic": set("AHGB"),
++}
++_LOGSPACE_PATTERN = re.compile(r"^logspace\((.*)\)$", re.IGNORECASE)
++
++
++def _validate_candidates(candidates):
++    if not candidates:
++        raise ValueError("At least one regularization candidate is required")
++    if not np.all(np.isfinite(candidates)):
++        raise ValueError("Regularization candidates must be finite")
++    if np.any(np.asarray(candidates) < 0):
++        raise ValueError("Regularization candidates must be nonnegative")
++    return [float(value) for value in candidates]
++
++
++def parse_candidate_spec(spec):
++    """Parse comma-separated floats or logspace(start, stop, count)."""
++    text = spec.strip()
++    if not text:
++        raise ValueError("Regularization candidate input cannot be empty")
++
++    logspace_match = _LOGSPACE_PATTERN.fullmatch(text)
++    if logspace_match:
++        arguments = [part.strip() for part in logspace_match.group(1).split(",")]
++        if len(arguments) != 3:
++            raise ValueError(
++                "logspace requires start exponent, stop exponent, and count"
++            )
++        try:
++            start = float(arguments[0])
++            stop = float(arguments[1])
++            count = int(arguments[2])
++        except ValueError as error:
++            raise ValueError(
++                "logspace arguments must be two numbers and an integer count"
++            ) from error
++        if count <= 0:
++            raise ValueError("logspace count must be positive")
++        return _validate_candidates(np.logspace(start, stop, count).tolist())
++
++    if text.lower().startswith("logspace"):
++        raise ValueError(
++            "Invalid logspace syntax; use logspace(start, stop, count)"
++        )
++
++    try:
++        candidates = [float(part.strip()) for part in text.split(",")]
++    except ValueError as error:
++        raise ValueError(
++            "Regularization candidates must be comma-separated numbers"
++        ) from error
++    return _validate_candidates(candidates)
++
++
++def _normalize_group(group):
++    normalized = []
++    for operator in group.strip():
++        normalized.append("c" if operator in "cC" else operator.upper())
++    return "".join(normalized)
++
++
++def required_operators(model_type, forcing):
++    if model_type not in _MODEL_OPERATORS:
++        raise ValueError(
++            f"Grouped regularization is not supported for model type {model_type!r}"
++        )
++    operators = set(_MODEL_OPERATORS[model_type])
++    if forcing:
++        operators.add("c")
++    return operators
++
++
++def default_groups(model_type, forcing):
++    """Return one-time seed groups for a grouped GUI search."""
++    if model_type in ("linear", "linear-symmetric"):
++        groups = ["A", "B"]
++    elif model_type == "quadratic":
++        groups = ["A", "H", "B"]
++    elif model_type == "cubic":
++        groups = ["A", "HG", "B"]
++    else:
++        raise ValueError(
++            f"Grouped regularization is not supported for model type {model_type!r}"
++        )
++    return (["c"] if forcing else []) + groups
++
++
++def parse_grouped_specs(group_specs, model_type, forcing):
++    """Convert GUI group/spec pairs to a backend-compatible candidate dictionary."""
++    required = required_operators(model_type, forcing)
++    if not group_specs:
++        raise ValueError("Add at least one regularization group")
++
++    result = {}
++    used = set()
++    for raw_group, candidate_spec in group_specs:
++        group = _normalize_group(raw_group)
++        if not group:
++            raise ValueError("Regularization group names cannot be empty")
++        operators = set(group)
++        if len(operators) != len(group):
++            raise ValueError(f"Regularization group {group!r} repeats an operator")
++        unsupported = operators - _SUPPORTED_OPERATORS
++        if unsupported:
++            raise ValueError(
++                f"Regularization group {group!r} contains unsupported operators"
++            )
++        overlap = operators & used
++        if overlap:
++            raise ValueError(
++                "Regularization operators may appear in only one group: "
++                + ", ".join(sorted(overlap))
++            )
++        used.update(operators)
++        result[group] = parse_candidate_spec(candidate_spec)
++
++    if used != required:
++        missing = "".join(sorted(required - used))
++        extra = "".join(sorted(used - required))
++        details = []
++        if missing:
++            details.append(f"missing {missing}")
++        if extra:
++            details.append(f"not used by this model: {extra}")
++        raise ValueError("Regularization groups do not match the model (" + "; ".join(details) + ")")
++    return result
++
++
++def build_regularization_setting(mode, shared_spec, group_specs, model_type, forcing):
++    if mode == AUTOMATIC_MODE:
++        return "automatic"
++    if mode == SHARED_MODE:
++        return parse_candidate_spec(shared_spec)
++    if mode == GROUPED_MODE:
++        return parse_grouped_specs(group_specs, model_type, forcing)
++    raise ValueError(f"Unknown regularization mode {mode!r}")
++
++
++def search_combination_count(setting):
++    if isinstance(setting, dict):
++        return math.prod(len(candidates) for candidates in setting.values())
++    if isinstance(setting, list):
++        return len(setting)
++    return 1
+diff --git a/tests/opinf/test_mass_matrix.py b/tests/opinf/test_mass_matrix.py
+new file mode 100644
+index 0000000..90b7644
+--- /dev/null
++++ b/tests/opinf/test_mass_matrix.py
+@@ -0,0 +1,154 @@
++import numpy as np
++import pytest
++from scipy import sparse
++
++import normaopinf.readers
++from normaopinf.opinf._mass_matrix import (
++    SparseMatrixWeightedL2Orthogonalizer,
++    component_mass_blocks,
++    prepare_mass_matrix,
++)
++
++
++def test_read_mass_matrix_npz(tmp_path):
++    path = tmp_path / "mass.npz"
++    matrix = sparse.coo_matrix(
++        (
++            np.array([2.0, 0.0, 3.0]),
++            (np.array([0, 1, 5]), np.array([0, 1, 5])),
++        ),
++        shape=(6, 6),
++    ).tocsc()
++    sparse.save_npz(path, matrix)
++
++    loaded = normaopinf.readers.read_mass_matrix_npz(path)
++
++    assert sparse.isspmatrix_csc(loaded)
++    assert loaded.has_sorted_indices
++    assert loaded.nnz == 2
++    assert np.allclose(loaded.toarray(), matrix.toarray())
++
++
++@pytest.mark.parametrize("shape", [(3, 6), (4, 4)])
++def test_read_mass_matrix_npz_rejects_invalid_shape(tmp_path, shape):
++    path = tmp_path / "mass.npz"
++    sparse.save_npz(path, sparse.eye(*shape, format="csc"))
++
++    with pytest.raises(ValueError, match="square|divisible by three"):
++        normaopinf.readers.read_mass_matrix_npz(path)
++
++
++def test_read_mass_matrix_npz_rejects_nonfinite_values(tmp_path):
++    path = tmp_path / "mass.npz"
++    sparse.save_npz(path, sparse.diags([1.0, np.nan, 1.0], format="csc"))
++
++    with pytest.raises(ValueError, match="non-finite"):
++        normaopinf.readers.read_mass_matrix_npz(path)
++
++
++def test_read_mass_matrix_npz_rejects_invalid_archive(tmp_path):
++    path = tmp_path / "mass.npz"
++    np.savez(path, unexpected=np.ones(3))
++
++    with pytest.raises(ValueError):
++        normaopinf.readers.read_mass_matrix_npz(path)
++
++
++def _interleaved_component_diagonal(x_values, y_values, z_values):
++    diagonal = np.column_stack((x_values, y_values, z_values)).ravel()
++    return sparse.diags(diagonal, format="csc")
++
++
++def test_prepare_mass_matrix_reorders_interleaved_dofs():
++    matrix = _interleaved_component_diagonal(
++        np.array([1.0, 2.0]),
++        np.array([3.0, 4.0]),
++        np.array([5.0, 6.0]),
++    )
++
++    reordered = prepare_mass_matrix(matrix, n_vars=3, n_nodes=2)
++
++    assert np.allclose(reordered.diagonal(), [1.0, 2.0, 3.0, 4.0, 5.0, 6.0])
++
++
++def test_prepare_mass_matrix_rejects_snapshot_shape_mismatch():
++    with pytest.raises(ValueError, match="does not match"):
++        prepare_mass_matrix(sparse.eye(6, format="csc"), n_vars=3, n_nodes=3)
++
++
++def test_prepare_mass_matrix_rejects_asymmetry():
++    matrix = sparse.eye(6, format="lil")
++    matrix[0, 3] = 0.5
++
++    with pytest.raises(ValueError, match="symmetry"):
++        prepare_mass_matrix(matrix.tocsc(), n_vars=3, n_nodes=2)
++
++
++def test_component_mass_blocks_uses_each_component():
++    matrix = sparse.block_diag(
++        (
++            sparse.diags([1.0, 2.0]),
++            sparse.diags([3.0, 4.0]),
++            sparse.diags([5.0, 6.0]),
++        ),
++        format="csc",
++    )
++
++    blocks = component_mass_blocks(matrix, n_nodes=2)
++
++    assert [block.diagonal().tolist() for block in blocks] == [
++        [1.0, 2.0],
++        [3.0, 4.0],
++        [5.0, 6.0],
++    ]
++
++
++def test_component_mass_blocks_rejects_cross_component_coupling():
++    matrix = sparse.eye(6, format="lil")
++    matrix[0, 2] = matrix[2, 0] = 0.25
++
++    with pytest.raises(ValueError, match="cross-component"):
++        component_mass_blocks(matrix.tocsc(), n_nodes=2)
++
++
++def test_sparse_weighted_orthogonalizer():
++    weight = sparse.diags([1.0, 2.0, 3.0, 4.0], format="csc")
++    basis = np.array(
++        [
++            [1.0, 0.0],
++            [1.0, 1.0],
++            [0.0, 1.0],
++            [1.0, -1.0],
++        ]
++    )
++
++    result = SparseMatrixWeightedL2Orthogonalizer(weight).orthogonalize(basis)
++    gram = result.T @ (weight @ result)
++
++    assert np.allclose(gram, np.eye(2))
++
++
++def test_sparse_weighted_projection_matches_dense_reference():
++    weight = sparse.diags([1.0, 2.0, 3.0, 4.0], format="csc")
++    basis = np.array(
++        [
++            [1.0, 0.0],
++            [1.0, 1.0],
++            [0.0, 1.0],
++            [1.0, -1.0],
++        ]
++    )
++    snapshots = np.arange(12.0).reshape(4, 3)
++
++    sparse_result = np.linalg.solve(basis.T @ (weight @ basis), basis.T @ (weight @ snapshots))
++    dense_weight = weight.toarray()
++    dense_result = np.linalg.solve(basis.T @ dense_weight @ basis, basis.T @ dense_weight @ snapshots)
++    assert np.allclose(sparse_result, dense_result)
++
++
++def test_sparse_weighted_orthogonalizer_rejects_singular_gram():
++    weight = sparse.eye(3, format="csc")
++    basis = np.ones((3, 2))
++
++    with pytest.raises(ValueError, match="not positive definite"):
++        SparseMatrixWeightedL2Orthogonalizer(weight).orthogonalize(basis)
+diff --git a/tests/opinf/test_regularization_gui.py b/tests/opinf/test_regularization_gui.py
+new file mode 100644
+index 0000000..f39c965
+--- /dev/null
++++ b/tests/opinf/test_regularization_gui.py
+@@ -0,0 +1,116 @@
++import numpy as np
++import pytest
++
++from normaopinf.opinf._regularization_gui import (
++    AUTOMATIC_MODE,
++    GROUPED_MODE,
++    SHARED_MODE,
++    build_regularization_setting,
++    default_groups,
++    parse_candidate_spec,
++    parse_grouped_specs,
++    search_combination_count,
++)
++
++
++def test_parse_explicit_candidates():
++    assert parse_candidate_spec("0, 1e-4, 2.5") == [0.0, 1.0e-4, 2.5]
++
++
++def test_parse_logspace_candidates():
++    result = parse_candidate_spec("logspace(-4, 1, 6)")
++    assert np.allclose(result, np.logspace(-4, 1, 6))
++
++
++@pytest.mark.parametrize(
++    "spec",
++    [
++        "",
++        "1e-4, nope",
++        "-1, 1",
++        "nan, 1",
++        "logspace(-4, 1)",
++        "logspace(-4, 1, 0)",
++        "logspace(-4, 1, 2.5)",
++    ],
++)
++def test_parse_candidate_spec_rejects_invalid_input(spec):
++    with pytest.raises(ValueError):
++        parse_candidate_spec(spec)
++
++
++@pytest.mark.parametrize(
++    ("model_type", "forcing", "expected"),
++    [
++        ("linear", False, ["A", "B"]),
++        ("linear", True, ["c", "A", "B"]),
++        ("quadratic", False, ["A", "H", "B"]),
++        ("cubic", False, ["A", "HG", "B"]),
++    ],
++)
++def test_default_groups(model_type, forcing, expected):
++    assert default_groups(model_type, forcing) == expected
++
++
++def test_parse_grouped_specs():
++    result = parse_grouped_specs(
++        [
++            ("a", "1e-4, 1e-3"),
++            ("hg", "logspace(-4, -3, 2)"),
++            ("b", "1e-2"),
++        ],
++        model_type="cubic",
++        forcing=False,
++    )
++    assert list(result) == ["A", "HG", "B"]
++    assert np.allclose(result["HG"], [1e-4, 1e-3])
++    assert search_combination_count(result) == 4
++
++
++@pytest.mark.parametrize(
++    "group_specs",
++    [
++        [("A", "1"), ("AH", "1"), ("B", "1")],
++        [("A", "1"), ("B", "1")],
++        [("AA", "1"), ("H", "1"), ("B", "1")],
++        [("A", "1"), ("X", "1"), ("H", "1"), ("B", "1")],
++        [],
++    ],
++)
++def test_parse_grouped_specs_rejects_invalid_groups(group_specs):
++    with pytest.raises(ValueError):
++        parse_grouped_specs(group_specs, model_type="quadratic", forcing=False)
++
++
++def test_grouped_specs_require_forcing_constant():
++    with pytest.raises(ValueError, match="missing c"):
++        parse_grouped_specs(
++            [("A", "1"), ("B", "1")],
++            model_type="linear",
++            forcing=True,
++        )
++
++
++def test_grouped_mode_rejects_neural_network_model():
++    with pytest.raises(ValueError, match="not supported"):
++        build_regularization_setting(
++            GROUPED_MODE,
++            "1",
++            [],
++            model_type="neural-network",
++            forcing=False,
++        )
++
++
++def test_build_automatic_and_shared_settings():
++    assert (
++        build_regularization_setting(
++            AUTOMATIC_MODE, "invalid", [], "linear", False
++        )
++        == "automatic"
++    )
++    shared = build_regularization_setting(
++        SHARED_MODE, "1e-4, 1e-3", [], "linear", False
++    )
++    assert shared == [1e-4, 1e-3]
++    assert search_combination_count(shared) == 2

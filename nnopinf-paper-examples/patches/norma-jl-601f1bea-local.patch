@@ -1,0 +1,2372 @@
+diff --git a/Project.toml b/Project.toml
+index b1b036c0..7da6903a 100644
+--- a/Project.toml
++++ b/Project.toml
+@@ -14,6 +14,7 @@ LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+ Logging = "56ddb016-857b-54e1-b83d-db4d58db5568"
+ NPZ = "15e1cf62-19b3-5cfa-8e77-841668bca605"
+ Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
++PyCall = "438e738f-606a-5dbb-bf0a-cddfbfd45ab0"
+ Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+ SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
+ StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
+@@ -21,24 +22,11 @@ Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
+ Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
+ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+ YAML = "ddb6d928-2868-570f-bddf-ab3f9cf99eb6"
+-
+-[weakdeps]
+-PyCall = "438e738f-606a-5dbb-bf0a-cddfbfd45ab0"
++ZipFile = "a5390f91-8eb1-5f08-bee0-b1d1ffed6cea"
+ 
+ [extensions]
+-# Neural-network OpInf ROM backend (PyTorch via PyCall). Loaded automatically
+-# only when PyCall is present in the active environment.
+ NormaPyTorchExt = "PyCall"
+ 
+-[extras]
+-# Test-only: `Pkg.test` runs the neural-network ROM test (`--with-nnopinf`),
+-# which needs the PyCall backend. Listing PyCall here makes it available in the
+-# test environment; the normal install (instantiate) still pulls no Python.
+-PyCall = "438e738f-606a-5dbb-bf0a-cddfbfd45ab0"
+-
+-[targets]
+-test = ["PyCall"]
+-
+ [compat]
+ DelimitedFiles = "1"
+ Einsum = "0.4"
+@@ -57,4 +45,11 @@ StaticArrays = "1"
+ Statistics = "1"
+ Symbolics = "7"
+ YAML = "0.4"
++ZipFile = "0.10"
+ julia = "1"
++
++[extras]
++PyCall = "438e738f-606a-5dbb-bf0a-cddfbfd45ab0"
++
++[targets]
++test = ["PyCall"]
+diff --git a/docs/src/reference/mesh-and-io.md b/docs/src/reference/mesh-and-io.md
+index 86fb62a1..70b9e632 100644
+--- a/docs/src/reference/mesh-and-io.md
++++ b/docs/src/reference/mesh-and-io.md
+@@ -9,10 +9,12 @@ Exodus II format:
+ |---|---|---|
+ | `input mesh file` | yes | Exodus mesh read as input (opened read-only) |
+ | `output mesh file` | yes | Exodus results file written by the run |
++| `mass matrix file` | no | compressed sparse `.npz` file written once after initialization; the consistent mass matrix is used for implicit dynamics and the diagonal lumped mass matrix for explicit dynamics |
+ 
+ ```yaml
+ input mesh file: cantilever.g
+ output mesh file: cantilever.e
++mass matrix file: mass.npz
+ ```
+ 
+ The input and output paths must differ. The output file is (re)created at the
+@@ -20,6 +22,21 @@ start of the run as a copy of the input mesh and then populated with results.
+ Meshes carry the element blocks referenced by [`material: blocks`](materials.md)
+ and the node sets and side sets referenced by boundary and initial conditions.
+ 
++The optional mass matrix file uses SciPy's compressed sparse NPZ format and
++can be loaded directly in Python without expanding it to a dense matrix:
++
++```python
++from scipy.sparse import load_npz
++
++mass = load_npz("mass.npz")
++```
++
++The result is a CSC sparse matrix. Its DOFs are ordered by node as
++`[x₁, y₁, z₁, x₂, y₂, z₂, ...]`.
++
++For multidomain simulations, set `mass matrix file` in each subdomain input
++that should export its matrix, using a distinct file name for each subdomain.
++
+ ## Output cadence
+ 
+ | Key | Required | Default | Meaning |
+diff --git a/examples/ahead/overlap/cuboid/dynamic-opinf-fom/README.md b/examples/ahead/overlap/cuboid/dynamic-opinf-fom/README.md
+index 72a56c25..aea66355 100644
+--- a/examples/ahead/overlap/cuboid/dynamic-opinf-fom/README.md
++++ b/examples/ahead/overlap/cuboid/dynamic-opinf-fom/README.md
+@@ -203,3 +203,29 @@ solver:
+   absolute tolerance: 1.0e-06
+ ```
+ 
++### M-orthonormal bases
++
++An OpInf or RBF kernel ROM whose basis satisfies
++`Phi_free.T @ M_free_free @ Phi_free = I` can opt into mass-weighted
++full-to-reduced projection:
++
++```yaml
++model:
++  type: linear opinf rom
++  model-file: opinf-operator.npz
++  basis inner product: mass
++```
++
++Norma assembles the consistent finite-element mass from the ROM's shadow FOM
++and projects displacement, velocity, and acceleration as
++`q = Phi_free.T @ M_free_free @ x_free`. Fixed-DOF rows of the basis should
++be zero; prescribed motion continues to enter through the existing boundary
++operators. Norma checks the reduced Gram matrix against the identity with an
++infinity-norm tolerance of `1e-8` and aborts if the basis and runtime mass do
++not agree.
++
++The basis and mass use component-fast nodal ordering:
++`[x1, y1, z1, x2, y2, z2, ...]`. Reconstruction remains `x = Phi @ q`,
++and the reduced dynamics continue to use an identity reduced mass. Omit the
++key (or set it to `euclidean`) for existing Euclidean-orthonormal models.
++
+diff --git a/src/input_validation.jl b/src/input_validation.jl
+index 703c487f..770909be 100644
+--- a/src/input_validation.jl
++++ b/src/input_validation.jl
+@@ -68,6 +68,7 @@ const TOP_LEVEL_SINGLE_KEYS = Set([
+     "name",
+     "input mesh file",
+     "output mesh file",
++    "mass matrix file",
+     "time integrator",
+     "solver",
+     "model",
+@@ -163,6 +164,7 @@ const MODEL_KEYS = Set([
+     "model-directory",
+     "ensemble-size",
+     "rbf-type",
++    "basis inner product",
+ ])
+ 
+ const NODAL_RECOVERY_KEYS = Set(["method", "stress", "von mises stress", "internal variables", "deformation gradient"])
+diff --git a/src/io.jl b/src/io.jl
+index 9229d825..8b7bee76 100644
+--- a/src/io.jl
++++ b/src/io.jl
+@@ -6,6 +6,8 @@
+ 
+ using DelimitedFiles
+ using Format
++using NPZ
++using ZipFile
+ 
+ function _is_output_time(time::Float64, initial_time::Float64, interval::Float64; tol::Float64=1e-10)
+     interval <= 0.0 && return false
+@@ -157,6 +159,88 @@ function writedlm_nodal_array(filename::String, nodal_array::Matrix{Float64})
+     return nothing
+ end
+ 
++function _write_npz_array!(archive::ZipFile.Writer, name::String, value)
++    file = ZipFile.addfile(archive, name * ".npy"; method=ZipFile.Deflate)
++    try
++        NPZ.npzwritearray(file, value)
++    finally
++        close(file)
++    end
++    return nothing
++end
++
++# SciPy's sparse NPZ schema stores `format` as a zero-dimensional NumPy byte
++# string (dtype `|S3` for "csc"). NPZ.jl supports numeric and boolean arrays,
++# but not fixed-width byte strings, so write this one small NPY member directly.
++function _write_npz_ascii_scalar!(archive::ZipFile.Writer, name::String, value::String)
++    bytes = Vector{UInt8}(codeunits(value))
++    file = ZipFile.addfile(archive, name * ".npy"; method=ZipFile.Deflate)
++    try
++        write(file, UInt8[0x93, 'N', 'U', 'M', 'P', 'Y'])
++        write(file, UInt8[1, 0])
++        header = "{'descr': '|S$(length(bytes))', 'fortran_order': False, 'shape': (), }"
++        # NPY v1 requires the complete header (magic through newline) to end on
++        # a 64-byte boundary. The prefix is 6-byte magic + 2-byte version +
++        # 2-byte little-endian header length.
++        padding = mod(-(10 + ncodeunits(header) + 1), 64)
++        header = header * repeat(" ", padding) * "\n"
++        write(file, htol(UInt16(ncodeunits(header))))
++        write(file, header)
++        write(file, bytes)
++    finally
++        close(file)
++    end
++    return nothing
++end
++
++function _mass_matrix_filename(value)
++    value isa AbstractString || norma_abort("`mass matrix file` must be a file name.")
++    filename = String(value)
++    lowercase(splitext(filename)[2]) == ".npz" || norma_abort(
++        "`mass matrix file` must use the `.npz` extension (got '$filename').",
++    )
++    return filename
++end
++
++"""
++Write the initialized mass matrix as a DEFLATE-compressed, SciPy-compatible
++sparse CSC `.npz` archive.
++
++Implicit dynamics uses the consistent mass matrix assembled on `model.mass`.
++Explicit dynamics uses the lumped mass vector, represented as a diagonal CSC
++matrix so both integrator families share one output format.
++"""
++function write_mass_matrix(sim::SingleDomainSimulation)
++    filename_value = get(sim.params, "mass matrix file", nothing)
++    filename_value === nothing && return nothing
++    filename = _mass_matrix_filename(filename_value)
++
++    model = get_fom_model(sim)
++    mass_matrix = if !isempty(model.mass)
++        model.mass
++    elseif !isempty(model.lumped_mass)
++        spdiagm(0 => model.lumped_mass)
++    else
++        norma_abort(
++            "Cannot write `mass matrix file` for a simulation whose time integrator " *
++            "does not assemble a mass matrix. Use a dynamic time integrator.",
++        )
++    end
++
++    archive = ZipFile.Writer(filename)
++    try
++        _write_npz_array!(archive, "data", mass_matrix.nzval)
++        _write_npz_array!(archive, "indices", Int64.(mass_matrix.rowval .- 1))
++        _write_npz_array!(archive, "indptr", Int64.(mass_matrix.colptr .- 1))
++        _write_npz_array!(archive, "shape", Int64[size(mass_matrix, 1), size(mass_matrix, 2)])
++        _write_npz_ascii_scalar!(archive, "format", "csc")
++    finally
++        close(archive)
++    end
++    norma_log(0, :output, "Mass matrix: $(filename)")
++    return nothing
++end
++
+ function get_umax(model::SolidMechanics)
+   u_max = maximum(abs, model.displacement)
+   return u_max
+diff --git a/src/kroms/krom_model.jl b/src/kroms/krom_model.jl
+index 84629bf0..b6b7a8d4 100644
+--- a/src/kroms/krom_model.jl
++++ b/src/kroms/krom_model.jl
+@@ -14,6 +14,8 @@ function RBFKernelROM(params::Parameters)
+     )
+ 
+     basis = opinf_rom["basis"]
++    basis_inner_product = basis_inner_product_from_params(params)
++    basis_projector = initial_basis_projector(basis, basis_inner_product)
+     _, _, reduced_dim = size(basis)
+     num_dofs = reduced_dim
+     time = 0.0
+@@ -31,6 +33,9 @@ function RBFKernelROM(params::Parameters)
+         opinf_rom,
+         forcing,
+         basis,
++        basis_inner_product,
++        basis_projector,
++        BitVector(),
+         reduced_state,
+         reduced_velocity,
+         reduced_boundary_forcing,
+diff --git a/src/kroms/krom_model_types.jl b/src/kroms/krom_model_types.jl
+index 5ed392dc..03d0e13a 100644
+--- a/src/kroms/krom_model_types.jl
++++ b/src/kroms/krom_model_types.jl
+@@ -5,6 +5,9 @@ mutable struct RBFKernelROM <: OpInfModel
+     opinf_rom::Dict{Any,Any}
+     forcing::Vector{Float64}
+     basis::Array{Float64}
++    basis_inner_product::Symbol
++    basis_projector::Matrix{Float64}
++    projector_free_dofs::BitVector
+     reduced_state::Vector{Float64}
+     reduced_velocity::Vector{Float64}
+     reduced_boundary_forcing::Vector{Float64}
+diff --git a/src/model.jl b/src/model.jl
+index 9b142be3..8cba4317 100644
+--- a/src/model.jl
++++ b/src/model.jl
+@@ -647,6 +647,69 @@ function add_lumped_mass!(M::MVector{R,T}, Nξ::SVector{N,T}, density::T, dV::T)
+     return nothing
+ end
+ 
++"""
++Assemble the consistent finite-element mass matrix from the reference
++configuration without evaluating constitutive response or changing model state.
++"""
++function assemble_consistent_mass_matrix(model::SolidMechanics)
++    input_mesh = model.mesh
++    num_nodes = size(model.reference, 2)
++    num_dofs = 3 * num_nodes
++    mass_tl = create_threadlocal_coo_matrices(count_coo_matrix_nnz(model))
++
++    blocks = Exodus.read_sets(input_mesh, Block)
++    for (block_index, block) in enumerate(blocks)
++        density = model.materials[block_index].ρ
++        block_id = block.id
++        element_type_string = Exodus.read_block_parameters(input_mesh, block_id)[1]
++        element_type = element_type_from_string(element_type_string)
++        num_points = model.num_int_pts[block_index]
++        N, dN, ip_weights = isoparametric(element_type, num_points)
++        connectivity = get_block_connectivity(input_mesh, block_id)
++        num_block_elements, num_element_nodes = size(connectivity)
++        element_dofs_tl = [zeros(Int64, 3 * num_element_nodes) for _ in 1:maxthreadid()]
++        element_mass_tl = [zeros(3 * num_element_nodes, 3 * num_element_nodes) for _ in 1:maxthreadid()]
++
++        @threads for block_element_index in 1:num_block_elements
++            t = threadid()
++            connectivity_indices =
++                ((block_element_index - 1) * num_element_nodes + 1):(block_element_index * num_element_nodes)
++            node_indices = connectivity[connectivity_indices]
++            dofs = element_dofs_tl[t]
++            dofs .= reshape(3 .* node_indices' .- [2, 1, 0], :)
++            element_mass = element_mass_tl[t]
++            fill!(element_mass, 0.0)
++
++            element_reference_position = if model.mesh_smoothing
++                create_smooth_reference(
++                    model.smooth_reference,
++                    element_type,
++                    model.reference[:, node_indices],
++                    model.size_field,
++                    model.time,
++                )
++            else
++                model.reference[:, node_indices]
++            end
++
++            for point in 1:num_points
++                Np = N[:, point]
++                dXdξ = SMatrix{3,3,Float64,9}(dN[:, :, point] * element_reference_position')
++                det_dXdξ = det(dXdξ)
++                if !(det_dXdξ > 0.0 && isfinite(det_dXdξ))
++                    norma_abort("Cannot assemble ROM projection mass: non-positive reference-element Jacobian.")
++                end
++                reduced_mass = Np * Np' * density * det_dXdξ * ip_weights[point]
++                for component in 1:3
++                    element_mass[component:3:end, component:3:end] .+= reduced_mass
++                end
++            end
++            assemble!(mass_tl[t], element_mass, dofs)
++        end
++    end
++    return merge_threadlocal_coo_matrices(mass_tl, num_dofs)
++end
++
+ function compute_flags(model::SolidMechanics, integrator::TimeIntegrator, solver::Solver)
+     is_implicit_dynamic = integrator isa Newmark
+     is_explicit_dynamic = integrator isa CentralDifference
+diff --git a/src/opinf/opinf_ics_bcs.jl b/src/opinf/opinf_ics_bcs.jl
+index e375c3a2..97272f9d 100644
+--- a/src/opinf/opinf_ics_bcs.jl
++++ b/src/opinf/opinf_ics_bcs.jl
+@@ -133,43 +133,29 @@ end
+ ## only reachable once a NeuralNetworkOpInfRom has been constructed, which already
+ ## requires the PyCall extension.
+ 
+-function apply_ics(params::Parameters, model::RomModel, integrator::TimeIntegrator, solver::Solver)
+-  ## Need to create a fake time integrator and solver for the FOM IC routine
+-  apply_ics(params, model.fom_model, integrator.fom_integrator, solver.fom_solver)
+-  # The FOM displacement/velocity arrays are nonzero (and must be projected
+-  # onto the reduced basis below) in two mutually-exclusive cases: an explicit
+-  # `initial conditions:` block (just applied above), or a `restart:` snapshot
+-  # (applied directly to model.fom_model.displacement/velocity inside
+-  # SolidMechanics() construction, before this function ever runs — see
+-  # model.jl and process_restart!() in simulation.jl). Without this check,
+-  # reduced_state/reduced_velocity would silently stay at their
+-  # zero-initialized default on restart, discarding the restored FOM state.
+-  has_ics = haskey(params, "initial conditions")
+-  is_restart = get(params, "restart_info", nothing) !== nothing
+-  if !has_ics && !is_restart
+-    return nothing
+-  end
+-  n_var, n_node, n_mode = size(model.basis)
+-  n_var_fom, n_node_fom = size(model.fom_model.displacement)
+-  # Make sure basis is the right size
+-  if n_var != n_var_fom || n_node != n_node_fom
+-    norma_abort("Basis is wrong size")
+-  end
+-  # project onto basis
+-  for k in 1:n_mode
+-    model.reduced_state[k] = 0.0
+-    model.reduced_velocity[k] = 0.0
+-    for j in 1:n_node
+-      for n in 1:n_var
+-        model.reduced_state[k] +=
+-          model.basis[n, j, k] * model.fom_model.displacement[n, j]
+-        model.reduced_velocity[k] += model.basis[n, j, k] * (model.fom_model.velocity[n, j])
+-      end
+-    end
+-  end
+-  if is_restart
++function has_rom_initial_state(params::Parameters)
++  return haskey(params, "initial conditions") || get(params, "restart_info", nothing) !== nothing
++end
++
++function project_rom_initial_conditions!(params::Parameters, model::OpInfModel)
++  has_rom_initial_state(params) || return nothing
++  n_var, n_node, _ = size(model.basis)
++  size(model.fom_model.displacement) == (n_var, n_node) || norma_abort("Basis is wrong size")
++  model.reduced_state .= project_fom_field(model, model.fom_model.displacement)
++  model.reduced_velocity .= project_fom_field(model, model.fom_model.velocity)
++  if get(params, "restart_info", nothing) !== nothing
+     norma_log(0, :restart, "Projected restarted FOM displacement/velocity onto the reduced basis.")
+   end
++  return nothing
++end
++
++function apply_ics(params::Parameters, model::OpInfModel, integrator::TimeIntegrator, solver::Solver)
++  # Seed the shadow FOM first. Euclidean projection remains here to preserve
++  # legacy ordering exactly. Mass projection is deferred until apply_bcs has
++  # established the free-DOF mask and the M-weighted projector is prepared.
++  apply_ics(params, model.fom_model, integrator.fom_integrator, solver.fom_solver)
++  model.basis_inner_product == :euclidean && project_rom_initial_conditions!(params, model)
++  return nothing
+ end
+ 
+ function apply_bcs(model::RomModel)
+diff --git a/src/opinf/opinf_model.jl b/src/opinf/opinf_model.jl
+index ecfce939..bfb2e453 100644
+--- a/src/opinf/opinf_model.jl
++++ b/src/opinf/opinf_model.jl
+@@ -6,21 +6,115 @@
+ 
+ using NPZ
+ 
++function basis_inner_product_from_params(params::Parameters)
++    value = get(params["model"], "basis inner product", "euclidean")
++    value isa AbstractString || norma_abort("`model: basis inner product` must be `euclidean` or `mass`.")
++    mode = Symbol(lowercase(String(value)))
++    mode in (:euclidean, :mass) ||
++        norma_abort("`model: basis inner product` must be `euclidean` or `mass` (got '$value').")
++    return mode
++end
++
++function initial_basis_projector(basis::Array{Float64}, mode::Symbol)
++    num_modes = size(basis, 3)
++    if mode == :euclidean
++        return Matrix(reshape(basis, :, num_modes)')
++    end
++    return zeros(0, 0)
++end
++
++function build_mass_basis_projector(
++    basis::Array{Float64},
++    mass::SparseMatrixCSC{Float64,Int64},
++    free_dofs::BitVector;
++    validate::Bool=true,
++)
++    num_modes = size(basis, 3)
++    basis_matrix = reshape(basis, :, num_modes)
++    num_dofs = size(basis_matrix, 1)
++    size(mass) == (num_dofs, num_dofs) ||
++        norma_abort("Basis and consistent mass matrix have incompatible dimensions.")
++    length(free_dofs) == num_dofs ||
++        norma_abort("Basis and free-DOF mask have incompatible dimensions.")
++    any(free_dofs) || norma_abort("Cannot project a ROM state because there are no free full-order DOFs.")
++
++    projector = zeros(num_modes, num_dofs)
++    free_basis = basis_matrix[free_dofs, :]
++    free_mass = mass[free_dofs, free_dofs]
++    projector[:, free_dofs] .= free_basis' * free_mass
++
++    if validate
++        gram = projector * basis_matrix
++        identity_matrix = Matrix{Float64}(I, num_modes, num_modes)
++        gram_error = norm(gram - identity_matrix, Inf)
++        if !isfinite(gram_error) || gram_error > BASIS_ORTHONORMALITY_TOLERANCE
++            norma_abortf(
++                "The mass-weighted ROM basis is not M-orthonormal on the free DOFs: " *
++                "||Phi_f' * M_ff * Phi_f - I||_Inf = %.6e (tolerance %.1e, %d modes). " *
++                "Check the mesh, material densities, integration rules, DOF ordering, " *
++                "fixed-DOF mask, and basis construction.",
++                gram_error,
++                BASIS_ORTHONORMALITY_TOLERANCE,
++                num_modes,
++            )
++        end
++    end
++    return projector
++end
++
++function prepare_basis_projector!(model::OpInfModel; reuse_fom_mass::Bool=false)
++    model.basis_inner_product == :euclidean && return nothing
++    free_dofs = model.fom_model.free_dofs
++    if !isempty(model.basis_projector) && model.projector_free_dofs == free_dofs
++        return nothing
++    end
++
++    mass = assemble_consistent_mass_matrix(model.fom_model)
++    model.basis_projector = build_mass_basis_projector(model.basis, mass, free_dofs)
++    model.projector_free_dofs = copy(free_dofs)
++
++    if reuse_fom_mass
++        model.fom_model.mass = mass
++        model.fom_model.compute_mass = false
++    end
++    norma_log(1, :setup, "Prepared M-orthonormal ROM basis projector.")
++    return nothing
++end
++
++function project_fom_field(model::OpInfModel, field::AbstractArray{<:Real}; free_only::Bool=false)
++    num_full_dofs = size(model.basis, 1) * size(model.basis, 2)
++    num_field_dofs = length(field)
++    compatible = num_field_dofs == num_full_dofs ||
++        (model.basis_inner_product == :euclidean && num_field_dofs < num_full_dofs)
++    compatible || norma_abort("Basis and full-order field have incompatible dimensions.")
++    isempty(model.basis_projector) &&
++        norma_abort("The mass-weighted ROM basis projector has not been initialized.")
++    values = vec(field)
++    if free_only && model.basis_inner_product == :euclidean
++        values = copy(values)
++        values[.!model.fom_model.free_dofs] .= 0.0
++    end
++    if num_field_dofs == num_full_dofs
++        return model.basis_projector * values
++    end
++    return view(model.basis_projector, :, 1:num_field_dofs) * values
++end
++
+ # --- Neural-network OpInf ROM: optional PyTorch backend ----------------------
+ # Loading the torch stiffness/BC models and running their forward passes is the
+ # only part of Norma that needs Python. That code lives in the NormaPyTorchExt
+ # package extension, which Julia loads automatically when PyCall is available in
+ # the active environment. The stub below is reached only when it is not, and
+ # gives a clear, actionable error instead of a cryptic failure.
+-const NN_OPINF_PYTORCH_MESSAGE =
+-    "Neural-network OpInf ROMs require the optional PyCall + PyTorch backend, " *
+-    "which is not installed. Add it with `import Pkg; Pkg.add(\"PyCall\")` and " *
+-    "make sure the Python it uses has PyTorch (torch) available."
++#const NN_OPINF_PYTORCH_MESSAGE =
++#    "Neural-network OpInf ROMs require the optional PyCall + PyTorch backend, " *
++#    "which is not installed. Add it with `import Pkg; Pkg.add(\"PyCall\")` and " *
++#    "make sure the Python it uses has PyTorch (torch) available."
+ 
+ # Load a torch model from each path and return them as a vector. The real
+ # implementation lives in ext/NormaPyTorchExt.jl; this broad `::Any` fallback is
+ # only used when the extension is not loaded.
+-load_torch_models(_paths) = norma_abort(NN_OPINF_PYTORCH_MESSAGE)
++#load_torch_models(_paths) = norma_abort(NN_OPINF_PYTORCH_MESSAGE)
+ 
+ function require_single_threaded_nn_opinf()
+     num_threads = Base.Threads.nthreads()
+@@ -42,6 +136,8 @@ function NeuralNetworkOpInfRom(params::Dict{String,Any})
+     basis_file = opinf_model_directory * "/nn-opinf-basis.npz"
+     basis = NPZ.npzread(basis_file)
+     basis = basis["basis"]
++    basis_inner_product = basis_inner_product_from_params(params)
++    basis_projector = initial_basis_projector(basis, basis_inner_product)
+     ensemble_size = params["model"]["ensemble-size"]
+     model = load_torch_models([
+         opinf_model_directory * "/stiffness-" * string(i - 1) * ".pt" for i in 1:ensemble_size
+@@ -60,6 +156,9 @@ function NeuralNetworkOpInfRom(params::Dict{String,Any})
+     NeuralNetworkOpInfRom(
+         model,
+         basis,
++        basis_inner_product,
++        basis_projector,
++        BitVector(),
+         reduced_state,
+         reduced_velocity,
+         reduced_boundary_forcing,
+@@ -81,6 +180,8 @@ function LinearOpInfRom(params::Parameters)
+     opinf_model = NPZ.npzread(opinf_model_file)
+     basis = opinf_model["basis"]
+     _, _, reduced_dim = size(basis)
++    basis_inner_product = basis_inner_product_from_params(params)
++    basis_projector = initial_basis_projector(basis, basis_inner_product)
+     num_dofs = reduced_dim
+     time = 0.0
+     failed = false
+@@ -93,6 +194,9 @@ function LinearOpInfRom(params::Parameters)
+     return LinearOpInfRom(
+         opinf_model,
+         basis,
++        basis_inner_product,
++        basis_projector,
++        BitVector(),
+         reduced_state,
+         reduced_velocity,
+         reduced_boundary_forcing,
+@@ -114,6 +218,8 @@ function QuadraticOpInfRom(params::Parameters)
+     basis = opinf_model["basis"]
+     _, _, reduced_dim = size(basis)
+     num_dofs = reduced_dim
++    basis_inner_product = basis_inner_product_from_params(params)
++    basis_projector = initial_basis_projector(basis, basis_inner_product)
+     time = 0.0
+     failed = false
+ 
+@@ -125,6 +231,9 @@ function QuadraticOpInfRom(params::Parameters)
+     return QuadraticOpInfRom(
+         opinf_model,
+         basis,
++        basis_inner_product,
++        basis_projector,
++        BitVector(),
+         reduced_state,
+         reduced_velocity,
+         reduced_boundary_forcing,
+@@ -147,6 +256,8 @@ function CubicOpInfRom(params::Parameters)
+     _, _, reduced_dim = size(basis)
+     num_dofs = reduced_dim
+     time = 0.0
++    basis_inner_product = basis_inner_product_from_params(params)
++    basis_projector = initial_basis_projector(basis, basis_inner_product)
+     failed = false
+ 
+     reduced_state = zeros(num_dofs)
+@@ -157,6 +268,9 @@ function CubicOpInfRom(params::Parameters)
+     return CubicOpInfRom(
+         opinf_model,
+         basis,
++        basis_inner_product,
++        basis_projector,
++        BitVector(),
+         reduced_state,
+         reduced_velocity,
+         reduced_boundary_forcing,
+@@ -168,3 +282,166 @@ function CubicOpInfRom(params::Parameters)
+         reference,
+     )
+ end
++
++
++
++
++
++
++
++
++using PyCall
++using LinearAlgebra
++
++
++
++
++
++
++# Convert a torch tensor to a Julia Vector{Float64}.
++function torch_tensor_vector(tensor)
++    values = tensor.detach().cpu().tolist()
++    if ndims(values) == 1
++        return Vector{Float64}(values)
++    end
++    return Vector{Float64}(values[1, :])
++end
++
++# Convert a torch tensor to a Julia Matrix{Float64}.
++function torch_tensor_matrix(tensor)
++    values = tensor.detach().cpu().tolist()
++    if ndims(values) == 2
++        return Matrix{Float64}(values)
++    end
++    return Matrix{Float64}(values[1, :, :])
++end
++
++# Real implementation of the stub declared in src/opinf/opinf_model.jl: load a
++# torch model from each path and return them as a vector.
++function load_torch_models(paths::Vector{String})
++    py"""
++    import torch, os
++    def _norma_load_torch_model(model_file):
++        assert os.path.isfile(model_file), model_file + " cannot be found"
++        return torch.load(model_file, weights_only=False)
++    """
++    return Any[py"_norma_load_torch_model"(path) for path in paths]
++end
++
++function apply_bc(model::NeuralNetworkOpInfRom, bc::SolidMechanicsOpInfDirichletBC)
++    model.fom_model.time = model.time
++    apply_bc(model.fom_model, bc.fom_bc)
++    bc_vector = zeros(0)
++    for node_index in bc.fom_bc.node_set_node_indices
++        disp_val = model.fom_model.displacement[bc.fom_bc.offset, node_index]
++        push!(bc_vector, disp_val)
++    end
++    py"""
++    import numpy as np
++    import torch
++    def setup_inputs(x):
++        xi = np.zeros((1, x.size))
++        xi[0] = x
++        return torch.tensor(xi)
++    """
++    if bc.offset == 1
++        offset_name = "x"
++    end
++    if bc.offset == 2
++        offset_name = "y"
++    end
++    if bc.offset == 3
++        offset_name = "z"
++    end
++    reduced_bc_vector = bc.basis[1, :, :]' * bc_vector
++    model_inputs = py"setup_inputs"(reduced_bc_vector)
++    name = "u-" * bc.name * "-" * offset_name
++    jdict = PyDict(Dict(name => model_inputs))
++    ensemble_size = size(bc.nn_model)[1]
++    for i in 1:ensemble_size
++        reduced_forcing = bc.nn_model[i].forward(jdict)
++        reduced_forcing = torch_tensor_vector(reduced_forcing)
++        model.reduced_boundary_forcing[:] += reduced_forcing
++    end
++    model.reduced_boundary_forcing[:] = model.reduced_boundary_forcing[:] ./ ensemble_size
++end
++
++function apply_bc_detail(model::NeuralNetworkOpInfRom, bc::SolidMechanicsOpInfOverlapSchwarzBoundaryCondition)
++    if typeof(Norma.coupled_subsim_of(bc).model) == Norma.SolidMechanics
++        ## Apply BC to the FOM vector
++        apply_bc_detail(model.fom_model, bc.fom_bc)
++        # populate our own BC vector
++        unique_node_indices = unique(bc.fom_bc.side_set_node_indices)
++        bc_vector = zeros(3, length(unique_node_indices))
++        for i in 1:length(unique_node_indices)
++            node_index = unique_node_indices[i]
++            bc_vector[:, i] = model.fom_model.displacement[:, node_index]
++        end
++        py"""
++        import numpy as np
++        import torch
++        def setup_inputs(x):
++            xi = np.zeros((1, x.size))
++            xi[0] = x
++            inputs = torch.tensor(xi)
++            return inputs
++        """
++        reduced_bc_vector = zeros(size(bc.basis)[3])
++        for i in 1:3
++            reduced_bc_vector[:] += bc.basis[i, :, :]' * bc_vector[i, :]
++        end
++        model_inputs = py"setup_inputs"(reduced_bc_vector)
++        name = "u-" * bc.name
++        jdict = PyDict(Dict(name => model_inputs))
++        ensemble_size = size(bc.nn_model)[1]
++        local_reduced_forcing = zeros(size(model.reduced_boundary_forcing)[1])
++        for i in 1:ensemble_size
++            reduced_forcing = bc.nn_model[i].forward(jdict)
++            reduced_forcing = torch_tensor_vector(reduced_forcing)
++            local_reduced_forcing[:] += reduced_forcing
++        end
++        local_reduced_forcing[:] = local_reduced_forcing[:] ./ ensemble_size
++        model.reduced_boundary_forcing[:] += local_reduced_forcing
++    else
++        throw("ROM-ROM coupling not supported yet")
++    end
++end
++
++function evaluate(integrator::RomNewmark, solver::RomHessianMinimizer, model::NeuralNetworkOpInfRom)
++    beta = integrator.β
++    dt = integrator.time_step
++    num_dof, = size(model.free_dofs)
++    I = Matrix{Float64}(LinearAlgebra.I, num_dof, num_dof)
++    py"""
++    import numpy as np
++    import torch
++    def setup_inputs(x):
++        xi = np.zeros((1, x.size))
++        xi[0] = x
++        inputs = {'x': torch.tensor(xi)}
++        return inputs
++    """
++    ensemble_size = size(model.nn_model)[1]
++    stiffness = zeros(num_dof, num_dof)
++    f = zeros(num_dof)
++    model_inputs = py"setup_inputs"(solver.solution)
++    for i in 1:ensemble_size
++        ft, Kt = model.nn_model[i].forward(model_inputs, return_jacobian=true)
++        f += torch_tensor_vector(ft)
++        stiffness += torch_tensor_matrix(Kt)
++    end
++    stiffness = stiffness ./ ensemble_size
++    f = f ./ ensemble_size
++    LHS = I / (dt * dt * beta) - stiffness
++    RHS = model.reduced_boundary_forcing + 1.0 / (dt * dt * beta) .* integrator.disp_pre
++    residual = RHS + f - I * solver.solution / (dt * dt * beta) #LHS * solver.solution
++    solver.hessian[:, :] = I / (dt * dt * beta) - stiffness
++    solver.gradient[:] = -residual
++    if any(!isfinite, solver.gradient)
++        model.failed = true
++        Norma.norma_log(0, :error, "Non-finite values detected in ROM residual. This may indicate solution divergence.")
++        return nothing
++    end
++    return nothing
++end
++
+diff --git a/src/opinf/opinf_model_types.jl b/src/opinf/opinf_model_types.jl
+index 175c16e1..ec9d7832 100644
+--- a/src/opinf/opinf_model_types.jl
++++ b/src/opinf/opinf_model_types.jl
+@@ -7,9 +7,14 @@
+ abstract type RomModel <: Model end
+ abstract type OpInfModel <: RomModel end
+ 
++const BASIS_ORTHONORMALITY_TOLERANCE = 1.0e-8
++
+ mutable struct NeuralNetworkOpInfRom <: OpInfModel
+     nn_model::Any
+     basis::Array{Float64}
++    basis_inner_product::Symbol
++    basis_projector::Matrix{Float64}
++    projector_free_dofs::BitVector
+     reduced_state::Vector{Float64}
+     reduced_velocity::Vector{Float64}
+     reduced_boundary_forcing::Vector{Float64}
+@@ -24,6 +29,9 @@ end
+ mutable struct CubicOpInfRom <: OpInfModel
+     opinf_rom::Dict{Any,Any}
+     basis::Array{Float64}
++    basis_inner_product::Symbol
++    basis_projector::Matrix{Float64}
++    projector_free_dofs::BitVector
+     reduced_state::Vector{Float64}
+     reduced_velocity::Vector{Float64}
+     reduced_boundary_forcing::Vector{Float64}
+@@ -38,6 +46,9 @@ end
+ mutable struct QuadraticOpInfRom <: OpInfModel
+     opinf_rom::Dict{Any,Any}
+     basis::Array{Float64}
++    basis_inner_product::Symbol
++    basis_projector::Matrix{Float64}
++    projector_free_dofs::BitVector
+     reduced_state::Vector{Float64}
+     reduced_velocity::Vector{Float64}
+     reduced_boundary_forcing::Vector{Float64}
+@@ -52,6 +63,9 @@ end
+ mutable struct LinearOpInfRom <: OpInfModel
+     opinf_rom::Dict{Any,Any}
+     basis::Array{Float64}
++    basis_inner_product::Symbol
++    basis_projector::Matrix{Float64}
++    projector_free_dofs::BitVector
+     reduced_state::Vector{Float64}
+     reduced_velocity::Vector{Float64}
+     reduced_boundary_forcing::Vector{Float64}
+diff --git a/src/opinf/opinf_solver.jl b/src/opinf/opinf_solver.jl
+index 1263625b..309ce189 100644
+--- a/src/opinf/opinf_solver.jl
++++ b/src/opinf/opinf_solver.jl
+@@ -32,7 +32,7 @@ function RomHessianMinimizer(params::Parameters, model::RomModel)
+     # matrices correctly.  "iterative" uses CG from IterativeSolvers; this is only
+     # appropriate when the ROM system matrix is symmetric positive-definite and the
+     # reduced dimension is large enough that a direct solve would be expensive.
+-    linear_solver = get(solver_params, "rom linear solver", "direct")
++    linear_solver = "direct"#get(solver_params, "rom linear solver", "direct")
+     linear_solver in ("direct", "iterative") || norma_abortf(
+         "Unknown ROM linear solver '%s'. Valid options are 'direct' and 'iterative'.",
+         linear_solver,
+@@ -198,7 +198,7 @@ end
+ function evaluate(integrator::RomCentralDifference, solver::RomExplicitSolver, model::LinearOpInfRom)
+     gamma = integrator.γ
+     dt = integrator.time_step
+-    ## Value for accelertaion - assumes bases are orthonormal to avoid solve
++    ## The configured orthonormality makes the reduced mass the identity.
+     solver.solution[:] =
+         model.opinf_rom["f"] + model.reduced_boundary_forcing - model.opinf_rom["K"] * integrator.displacement[:]
+     if any(!isfinite, solver.solution)
+@@ -212,7 +212,7 @@ end
+ function evaluate(integrator::RomCentralDifference, solver::RomExplicitSolver, model::QuadraticOpInfRom)
+     ## Explicit central difference evaluation for Quadratic OpInf ROM.
+     ## solver.solution holds the reduced acceleration.
+-    ## Assumes orthonormal bases so the reduced mass matrix is the identity.
++    ## The configured orthonormality makes the reduced mass matrix the identity.
+     ## Equation of motion: ẍ = f + f_bc - K*x - H*(x⊗x)
+     x = integrator.displacement
+     H = model.opinf_rom["H"]
+@@ -231,7 +231,7 @@ end
+ function evaluate(integrator::RomCentralDifference, solver::RomExplicitSolver, model::CubicOpInfRom)
+     ## Explicit central difference evaluation for Cubic OpInf ROM.
+     ## solver.solution holds the reduced acceleration.
+-    ## Assumes orthonormal bases so the reduced mass matrix is the identity.
++    ## The configured orthonormality makes the reduced mass matrix the identity.
+     ## Equation of motion: ẍ = f + f_bc - K*x - H*(x⊗x) - G*(x⊗x⊗x)
+     x = integrator.displacement
+     H = model.opinf_rom["H"]
+diff --git a/src/opinf/opinf_time_integrator.jl b/src/opinf/opinf_time_integrator.jl
+index a048d4f1..4ba9ab7e 100644
+--- a/src/opinf/opinf_time_integrator.jl
++++ b/src/opinf/opinf_time_integrator.jl
+@@ -108,25 +108,14 @@ function create_time_integrator(params::Parameters, model::RomModel)
+     end
+ end
+ 
+-function initialize(integrator::RomNewmark, solver::RomHessianMinimizer, model::RomModel; trust_schwarz::Bool=false)
++function initialize(integrator::RomNewmark, solver::RomHessianMinimizer, model::OpInfModel; trust_schwarz::Bool=false)
+     # Compute initial accelerations
+     initialize(integrator.fom_integrator, solver.fom_solver, model.fom_model; trust_schwarz=trust_schwarz)
+ 
+-    # project onto basis
+-    n_var, n_node, n_mode = size(model.basis)
+     integrator.displacement[:] = model.reduced_state[:]
+     integrator.velocity[:] = model.reduced_velocity[:]
+     solver.solution[:] = model.reduced_state[:]
+-
+-    for k in 1:n_mode
+-        integrator.acceleration[k] = 0.0
+-        for j in 1:n_node
+-            for n in 1:n_var
+-                integrator.acceleration[k] +=
+-                    model.basis[n, j, k] * integrator.fom_integrator.acceleration[3 * (j - 1) + n]
+-            end
+-        end
+-    end
++    integrator.acceleration .= project_fom_field(model, integrator.fom_integrator.acceleration)
+     return nothing
+ end
+ 
+@@ -156,24 +145,14 @@ function correct(integrator::RomNewmark, solver::Solver, model::RomModel)
+     return nothing
+ end
+ 
+-function initialize(integrator::RomCentralDifference, solver::RomExplicitSolver, model::RomModel; trust_schwarz::Bool=false)
++function initialize(integrator::RomCentralDifference, solver::RomExplicitSolver, model::OpInfModel; trust_schwarz::Bool=false)
+     # Compute initial accelerations
+     initialize(integrator.fom_integrator, solver.fom_solver, model.fom_model; trust_schwarz=trust_schwarz)
+-    # project onto basis
+-    n_var, n_node, n_mode = size(model.basis)
++
+     integrator.displacement[:] = model.reduced_state[:]
+     integrator.velocity[:] = model.reduced_velocity[:]
+     solver.solution[:] = model.reduced_state[:]
+-
+-    for k in 1:n_mode
+-        integrator.acceleration[k] = 0.0
+-        for j in 1:n_node
+-            for n in 1:n_var
+-                integrator.acceleration[k] +=
+-                    model.basis[n, j, k] * integrator.fom_integrator.acceleration[3 * (j - 1) + n]
+-            end
+-        end
+-    end
++    integrator.acceleration .= project_fom_field(model, integrator.fom_integrator.acceleration)
+     return nothing
+ end
+ 
+diff --git a/src/simulation.jl b/src/simulation.jl
+index 2c426f25..b1194674 100644
+--- a/src/simulation.jl
++++ b/src/simulation.jl
+@@ -1061,12 +1061,24 @@ function apply_bcs(sim::MultiDomainSimulation)
+     end
+ end
+ 
++function prepare_rom_basis_projection!(sim::SingleDomainSimulation)
++    model = sim.model
++    model isa OpInfModel || return nothing
++    prepare_basis_projector!(model; reuse_fom_mass=sim.integrator isa RomNewmark)
++    if model.basis_inner_product == :mass
++        project_rom_initial_conditions!(sim.params, model)
++    end
++    return nothing
++end
++
+ function initialize(sim::SingleDomainSimulation)
+     apply_ics(sim)
+     apply_bcs(sim)
++    prepare_rom_basis_projection!(sim)
+     log_dof_counts(sim.model)
+     initialize(sim.integrator, sim.solver, sim.model)
+     save_curr_state(sim)
++    write_mass_matrix(sim)
+     return nothing
+ end
+ 
+@@ -1086,6 +1098,9 @@ function initialize(sim::MultiDomainSimulation)
+         end
+     end
+     apply_bcs(sim)
++    for subsim in sim.subsims
++        prepare_rom_basis_projection!(subsim)
++    end
+     for subsim in sim.subsims
+         log_dof_counts(subsim.model)
+         initialize(subsim.integrator, subsim.solver, subsim.model)
+@@ -1157,6 +1172,12 @@ function initialize(sim::MultiDomainSimulation)
+                 save_history_snapshot(sim.controller, subsim, subsim_index)
+             end
+             apply_bcs(sim)
++            for subsim in sim.subsims
++                subsim.model isa OpInfModel || continue
++                prepare_basis_projector!(
++                    subsim.model; reuse_fom_mass=subsim.integrator isa RomNewmark
++                )
++            end
+             for subsim in sim.subsims
+                 initialize(subsim.integrator, subsim.solver, subsim.model; trust_schwarz=true)
+                 save_curr_state(subsim)
+@@ -1164,6 +1185,9 @@ function initialize(sim::MultiDomainSimulation)
+         end
+     end
+     detect_contact(sim)
++    for subsim in sim.subsims
++        write_mass_matrix(subsim)
++    end
+     return nothing
+ end
+ 
+diff --git a/src/swap.jl b/src/swap.jl
+index 28d90acc..60a23b4c 100644
+--- a/src/swap.jl
++++ b/src/swap.jl
+@@ -1036,10 +1036,12 @@ end
+ #   ROM  → FOM   lift the ROM's shadow FOM fields into the destination FOM
+ #   ROM  → ROM   project the source shadow FOM fields onto the new ROM basis
+ #
+-# For FOM→ROM and ROM→ROM the projection uses the L2/Galerkin formula
+-#       q̂ₖ = Σᵢ Σⱼ Φ[j,i,k] * u_fom[j,i]
+-# where Φ has shape (n_var, n_node, n_mode) and u_fom has shape (n_var, n_node).
+-# This is the same inner product used in the ROM time integrators.
++# For FOM→ROM and ROM→ROM the destination model selects the projection:
++# Euclidean models use q̂ = Φ' u, while M-orthonormal models use
++# q̂ = Φ_f' M_ff u_f. The latter excludes prescribed DOFs and uses the
++# consistent mass associated with the destination shadow FOM. In both cases
++# Φ has shape (n_var, n_node, n_mode), with x/y/z components stacked within
++# each node.
+ #
+ # When the source and destination share the *same* FOM mesh, the projection is
+ # exact up to machine precision.  When meshes differ (e.g. refining the FOM
+@@ -1114,63 +1116,26 @@ end
+ # Core projection helper: FOM nodal fields → ROM reduced coordinates
+ # ---------------------------------------------------------------------------
+ #
+-# Computes the Galerkin projection
+-#   q̂ₖ = Σᵢ Σⱼ Φ[i,j,k] * u[i,j]
+-# for displacement and velocity, using the shadow FOM stored on `rom`.
+-# Acceleration is projected the same way.  The reduced coordinates on `rom`
+-# are updated in-place.  The shadow FOM fields are assumed to be current
+-# before this function is called.
++# Projects displacement and velocity with the cached projector selected by
++# `model: basis inner product`. M-orthonormal models rebuild that projector
++# when the destination free-DOF mask changes. Acceleration is projected by the
++# same helper when the integrator is synchronized below. The reduced
++# coordinates on `rom` are updated in-place, and the shadow FOM fields are
++# assumed to be current before this function is called.
+ function _project_fom_to_rom!(rom::OpInfModel)
+-    basis = rom.basis                   # (n_var, n_node_basis, n_mode)
+-    fom   = rom.fom_model
+-    _, _, n_mode = size(basis)
+-
+-    u = fom.displacement  # (n_var, n_nodes_fom)
+-    v = fom.velocity
+-    a = fom.acceleration
+-    # Use the actual FOM node count, not the basis middle dimension.  The
+-    # basis array may have been generated with a different mesh or padded with
+-    # extra entries, so size(basis, 2) can exceed the number of FOM nodes and
+-    # must not be used to bound the node loop (it would produce out-of-bounds
+-    # accesses into fom.free_dofs).  This matches the pattern used everywhere
+-    # else in the codebase (e.g. reconstruct_fom_fields!).
+-    n_nodes_fom = size(u, 2)
+-
+-    q̂_u = zeros(n_mode)
+-    q̂_v = zeros(n_mode)
+-    q̂_a = zeros(n_mode)
+-
+-    for j in 1:n_nodes_fom
+-        x_dof = 3 * (j - 1) + 1
+-        y_dof = 3 * (j - 1) + 2
+-        z_dof = 3 * (j - 1) + 3
+-        for k in 1:n_mode
+-            if fom.free_dofs[x_dof]
+-                q̂_u[k] += basis[1, j, k] * u[1, j]
+-                q̂_v[k] += basis[1, j, k] * v[1, j]
+-                q̂_a[k] += basis[1, j, k] * a[1, j]
+-            end
+-            if fom.free_dofs[y_dof]
+-                q̂_u[k] += basis[2, j, k] * u[2, j]
+-                q̂_v[k] += basis[2, j, k] * v[2, j]
+-                q̂_a[k] += basis[2, j, k] * a[2, j]
+-            end
+-            if fom.free_dofs[z_dof]
+-                q̂_u[k] += basis[3, j, k] * u[3, j]
+-                q̂_v[k] += basis[3, j, k] * v[3, j]
+-                q̂_a[k] += basis[3, j, k] * a[3, j]
+-            end
+-        end
+-    end
+-
+-    rom.reduced_state    .= q̂_u
+-    rom.reduced_velocity .= q̂_v
+-    # Sync the ROM's time from its shadow FOM.
+-    rom.time              = fom.time
++    prepare_basis_projector!(rom)
++    fom = rom.fom_model
++    rom.reduced_state .= project_fom_field(rom, fom.displacement; free_only=true)
++    rom.reduced_velocity .= project_fom_field(rom, fom.velocity; free_only=true)
++    rom.time = fom.time
+ 
+-    norma_logf(1, :swap,
++    norma_logf(
++        1,
++        :swap,
+         "_project_fom_to_rom!: projected %d FOM DOFs onto %d ROM modes",
+-        3 * n_nodes_fom, n_mode)
++        length(fom.displacement),
++        length(rom.reduced_state),
++    )
+     return nothing
+ end
+ 
+@@ -1220,20 +1185,8 @@ function _sync_integrator_from_model!(integrator::TimeIntegrator, model::OpInfMo
+     # velocity predictors (e.g. ½dt²(1-2β)·a), producing a spurious one-step
+     # transient right at the swap time, even though correct() will eventually
+     # recompute a consistent acceleration once the solve converges.
+-    basis = model.basis
+-    fom   = model.fom_model
+-    n_var, _, n_mode = size(basis)
+-    n_nodes_fom = size(fom.acceleration, 2)
+-    fill!(integrator.acceleration, 0.0)
+-    for j in 1:n_nodes_fom
+-        for k in 1:n_mode
+-            for v in 1:n_var
+-                dof_index = 3 * (j - 1) + v
+-                if fom.free_dofs[dof_index]
+-                    integrator.acceleration[k] += basis[v, j, k] * fom.acceleration[v, j]
+-                end
+-            end
+-        end
+-    end
++    prepare_basis_projector!(model)
++    integrator.acceleration .=
++        project_fom_field(model, model.fom_model.acceleration; free_only=true)
+     return nothing
+ end
+diff --git a/test/helpers.jl b/test/helpers.jl
+index aaaf4b20..e2946027 100644
+--- a/test/helpers.jl
++++ b/test/helpers.jl
+@@ -3,6 +3,39 @@
+ # the U.S. Government retains certain rights in this software. This software
+ # is released under the BSD license detailed in the file license.txt in the
+ # top-level Norma.jl directory.
++using NPZ
++using SparseArrays
++using ZipFile
++
++function read_sparse_npz(filename::String)
++    arrays = NPZ.npzread(filename, ["data", "indices", "indptr", "shape"])
++    matrix_shape = Int.(arrays["shape"])
++    return SparseMatrixCSC(
++        matrix_shape[1],
++        matrix_shape[2],
++        Int.(arrays["indptr"] .+ 1),
++        Int.(arrays["indices"] .+ 1),
++        arrays["data"],
++    )
++end
++
++function is_compressed_scipy_csc_npz(filename::String)
++    archive = ZipFile.Reader(filename)
++    try
++        entries = Dict(file.name => file for file in archive.files)
++        expected_names = Set(["data.npy", "indices.npy", "indptr.npy", "shape.npy", "format.npy"])
++        Set(keys(entries)) == expected_names || return false
++        all(file.method == ZipFile.Deflate for file in values(entries)) || return false
++
++        # SciPy requires a zero-dimensional byte string whose value is "csc".
++        # The final three bytes of this NPY member are the scalar's payload.
++        format_bytes = read(entries["format.npy"])
++        return length(format_bytes) >= 3 && format_bytes[(end - 2):end] == UInt8['c', 's', 'c']
++    finally
++        close(archive)
++    end
++end
++
+ function average_components(V::Vector{Float64})
+     x = mean(V[1:3:end])
+     y = mean(V[2:3:end])
+diff --git a/test/input-validation.jl b/test/input-validation.jl
+index 09f40301..4acfb3ed 100644
+--- a/test/input-validation.jl
++++ b/test/input-validation.jl
+@@ -30,6 +30,24 @@ using YAML
+         @test Norma.suggest_key("completely unrelated key name", known) == ""
+     end
+ 
++    @testset "Mass matrix file" begin
++        params = Norma.Parameters(
++            "type" => "single",
++            "mass matrix file" => "mass.npz",
++        )
++        @test isempty(Norma.validate_input_parameters(params, "test.yaml"))
++        @test Norma._mass_matrix_filename("mass.NPZ") == "mass.NPZ"
++
++        previous_test_mode = Norma.NORMA_TEST_MODE[]
++        Norma.NORMA_TEST_MODE[] = true
++        try
++            @test_throws Norma.NormaAbortException Norma._mass_matrix_filename("mass.csv")
++            @test_throws Norma.NormaAbortException Norma._mass_matrix_filename(42)
++        finally
++            Norma.NORMA_TEST_MODE[] = previous_test_mode
++        end
++    end
++
+     @testset "Misspelled BC entry key" begin
+         params = Norma.Parameters(
+             "type" => "single",
+diff --git a/test/runtests.jl b/test/runtests.jl
+index 6640361e..b7934029 100644
+--- a/test/runtests.jl
++++ b/test/runtests.jl
+@@ -170,6 +170,7 @@ const indexed_test_files = [
+     (122, "input-validation.jl"),
+     (123, "schwarz-nonoverlap-static-inclusion-curved-interface.jl"),
+     (124, "three-field-element.jl"),
++    (125, "opinf-mass-projection.jl"),
+ ]
+ 
+ # Neural-network OpInf tests. These load the optional PyCall dependency to reach
+diff --git a/test/single-explicit-dynamic-solid-sho.jl b/test/single-explicit-dynamic-solid-sho.jl
+index 707e728a..2ccc54e8 100644
+--- a/test/single-explicit-dynamic-solid-sho.jl
++++ b/test/single-explicit-dynamic-solid-sho.jl
+@@ -3,15 +3,24 @@
+ # the U.S. Government retains certain rights in this software. This software
+ # is released under the BSD license detailed in the file license.txt in the
+ # top-level Norma.jl directory.
++using YAML
++
+ @testset "Single Explicit Dynamic Solid Sho" begin
+     cp("../examples/single/explicit-dynamic-solid/sho/sho.yaml", "sho.yaml"; force=true)
+     cp("../examples/single/explicit-dynamic-solid/sho/sho.g", "sho.g"; force=true)
+-    simulation = Norma.run("sho.yaml")
++    params = YAML.load_file("sho.yaml"; dicttype=Norma.Parameters)
++    params["name"] = "sho"
++    params["mass matrix file"] = "mass.npz"
++    simulation = Norma.run(params)
+     integrator = simulation.integrator
+     model = simulation.model
++    mass_matrix = read_sparse_npz("mass.npz")
++    @test mass_matrix == spdiagm(0 => model.lumped_mass)
++    @test is_compressed_scipy_csc_npz("mass.npz")
+     rm("sho.yaml"; force=true)
+     rm("sho.g"; force=true)
+     rm("sho.e"; force=true)
++    rm("mass.npz"; force=true)
+     displacement = integrator.displacement[end]
+     velocity = integrator.velocity[end]
+     acceleration = integrator.acceleration[end]
+diff --git a/test/single-implicit-dynamic-solid-sho.jl b/test/single-implicit-dynamic-solid-sho.jl
+index 42f8c888..f7884f94 100644
+--- a/test/single-implicit-dynamic-solid-sho.jl
++++ b/test/single-implicit-dynamic-solid-sho.jl
+@@ -3,14 +3,23 @@
+ # the U.S. Government retains certain rights in this software. This software
+ # is released under the BSD license detailed in the file license.txt in the
+ # top-level Norma.jl directory.
++using YAML
++
+ @testset "Single Implicit Dynamic Solid Sho" begin
+     cp("../examples/single/implicit-dynamic-solid/sho/sho.yaml", "sho.yaml"; force=true)
+     cp("../examples/single/implicit-dynamic-solid/sho/sho.g", "sho.g"; force=true)
+-    simulation = Norma.run("sho.yaml")
++    params = YAML.load_file("sho.yaml"; dicttype=Norma.Parameters)
++    params["name"] = "sho"
++    params["mass matrix file"] = "mass.npz"
++    simulation = Norma.run(params)
+     integrator = simulation.integrator
++    mass_matrix = read_sparse_npz("mass.npz")
++    @test mass_matrix == simulation.model.mass
++    @test is_compressed_scipy_csc_npz("mass.npz")
+     rm("sho.yaml"; force=true)
+     rm("sho.g"; force=true)
+     rm("sho.e"; force=true)
++    rm("mass.npz"; force=true)
+     displacement = integrator.displacement[end]
+     velocity = integrator.velocity[end]
+     acceleration = integrator.acceleration[end]
+diff --git a/Manifest.toml b/Manifest.toml
+new file mode 100644
+index 00000000..b7be8c8c
+--- /dev/null
++++ b/Manifest.toml
+@@ -0,0 +1,1021 @@
++# This file is machine-generated - editing it directly is not advised
++
++julia_version = "1.12.7"
++manifest_format = "2.0"
++project_hash = "ae9092504f79bef657a886e7519bc1681bc024c7"
++
++[[deps.ADTypes]]
++deps = ["PrecompileTools"]
++git-tree-sha1 = "629de23e1c16911b439dabd2303c08af9575b226"
++uuid = "47edcb42-4c32-4615-8424-f2b9edc5f35b"
++version = "1.24.0"
++
++    [deps.ADTypes.extensions]
++    ADTypesChainRulesCoreExt = "ChainRulesCore"
++    ADTypesConstructionBaseExt = "ConstructionBase"
++    ADTypesEnzymeCoreExt = "EnzymeCore"
++
++    [deps.ADTypes.weakdeps]
++    ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
++    ConstructionBase = "187b0558-2788-49d3-abe0-74a17ed4e7c9"
++    EnzymeCore = "f151be2c-9106-41f4-ab19-57ee4f262869"
++
++[[deps.AbstractPlutoDingetjes]]
++git-tree-sha1 = "6c3913f4e9bdf6ba3c08041a446fb1332716cbc2"
++uuid = "6e696c72-6542-2067-7265-42206c756150"
++version = "1.4.0"
++
++[[deps.AbstractTrees]]
++git-tree-sha1 = "2d9c9a55f9c93e8887ad391fbae72f8ef55e1177"
++uuid = "1520ce14-60c1-5f80-bbc7-55ef81b5835c"
++version = "0.4.5"
++
++[[deps.Accessors]]
++deps = ["CompositionsBase", "ConstructionBase", "Dates", "InverseFunctions", "MacroTools"]
++git-tree-sha1 = "7063ad1083578215c7c4bf410368150abe8d5524"
++uuid = "7d9f7c33-5ae7-4f3b-8dc6-eff91059b697"
++version = "0.1.45"
++
++    [deps.Accessors.extensions]
++    AxisKeysExt = "AxisKeys"
++    IntervalSetsExt = "IntervalSets"
++    LinearAlgebraExt = "LinearAlgebra"
++    StaticArraysExt = "StaticArrays"
++    StructArraysExt = "StructArrays"
++    TestExt = "Test"
++    UnitfulExt = "Unitful"
++
++    [deps.Accessors.weakdeps]
++    AxisKeys = "94b1ba4f-4ee9-5380-92f1-94cde586c3c5"
++    IntervalSets = "8197267c-284f-5f27-9208-e0e47529a953"
++    LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
++    StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
++    StructArrays = "09ab397b-f2b6-538f-b94a-2f83cf4a842a"
++    Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
++    Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
++
++[[deps.Adapt]]
++deps = ["LinearAlgebra"]
++git-tree-sha1 = "daa72978cd7a624246e894a4f4f067706d4e17e2"
++uuid = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
++version = "4.7.0"
++weakdeps = ["SparseArrays", "StaticArrays"]
++
++    [deps.Adapt.extensions]
++    AdaptSparseArraysExt = "SparseArrays"
++    AdaptStaticArraysExt = "StaticArrays"
++
++[[deps.ArgTools]]
++uuid = "0dad84c5-d112-42e6-8d28-ef12dabb789f"
++version = "1.1.2"
++
++[[deps.ArnoldiMethod]]
++deps = ["LinearAlgebra", "Random", "StaticArrays"]
++git-tree-sha1 = "d57bd3762d308bded22c3b82d033bff85f6195c6"
++uuid = "ec485272-7323-5ecc-a04f-4719b315124d"
++version = "0.4.0"
++
++[[deps.ArrayInterface]]
++deps = ["Adapt", "LinearAlgebra"]
++git-tree-sha1 = "daf5b2aab5b1c1fdcb65b05883cdb4b18abac1b9"
++uuid = "4fba245c-0d91-5ea0-9b3e-6abc04ee57a9"
++version = "7.30.1"
++
++    [deps.ArrayInterface.extensions]
++    ArrayInterfaceAMDGPUExt = "AMDGPU"
++    ArrayInterfaceBandedMatricesExt = "BandedMatrices"
++    ArrayInterfaceBlockBandedMatricesExt = "BlockBandedMatrices"
++    ArrayInterfaceCUDAExt = "CUDA"
++    ArrayInterfaceCUDSSExt = ["CUDSS", "CUDA"]
++    ArrayInterfaceChainRulesCoreExt = "ChainRulesCore"
++    ArrayInterfaceChainRulesExt = "ChainRules"
++    ArrayInterfaceFillArraysExt = "FillArrays"
++    ArrayInterfaceGPUArraysCoreExt = "GPUArraysCore"
++    ArrayInterfaceGPUArraysCoreTrackerExt = ["GPUArraysCore", "Tracker"]
++    ArrayInterfaceMetalExt = "Metal"
++    ArrayInterfaceReverseDiffExt = "ReverseDiff"
++    ArrayInterfaceSparseArraysExt = "SparseArrays"
++    ArrayInterfaceStaticArraysCoreExt = "StaticArraysCore"
++    ArrayInterfaceTrackerExt = "Tracker"
++
++    [deps.ArrayInterface.weakdeps]
++    AMDGPU = "21141c5a-9bdb-4563-92ae-f87d6854732e"
++    BandedMatrices = "aae01518-5342-5314-be14-df237901396f"
++    BlockBandedMatrices = "ffab5731-97b5-5995-9138-79e8c1846df0"
++    CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
++    CUDSS = "45b445bb-4962-46a0-9369-b4df9d0f772e"
++    ChainRules = "082447d4-558c-5d27-93f4-14fc19e9eca2"
++    ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
++    FillArrays = "1a297f60-69ca-5386-bcde-b61e274b549b"
++    GPUArraysCore = "46192b85-c4d5-4398-a991-12ede77f4527"
++    Metal = "dde4c033-4e86-420c-a63e-0dd931031962"
++    ReverseDiff = "37e2e3b7-166d-5795-8a7a-e32c996b4267"
++    SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
++    StaticArraysCore = "1e83bf80-4336-4d27-bf5d-d5a4f845583c"
++    Tracker = "9f7883ad-71c0-57eb-9f7f-b5c9e6d3789c"
++
++[[deps.Artifacts]]
++uuid = "56f22d72-fd6d-98f1-02f0-08ddc0907c33"
++version = "1.11.0"
++
++[[deps.Base64]]
++uuid = "2a0f44e3-6c83-55bd-87e4-b1978d98bd5f"
++version = "1.11.0"
++
++[[deps.Bijections]]
++git-tree-sha1 = "a2d308fcd4c2fb90e943cf9cd2fbfa9c32b69733"
++uuid = "e2ed5e7c-b2de-5872-ae92-c73ca462fb04"
++version = "0.2.2"
++
++[[deps.Blosc_jll]]
++deps = ["Artifacts", "JLLWrappers", "Libdl", "Lz4_jll", "Zlib_jll", "Zstd_jll"]
++git-tree-sha1 = "535c80f1c0847a4c967ea945fca21becc9de1522"
++uuid = "0b7ba130-8d10-5ba8-a3d6-c5182647fed9"
++version = "1.21.7+0"
++
++[[deps.Bzip2_jll]]
++deps = ["Artifacts", "JLLWrappers", "Libdl"]
++git-tree-sha1 = "1b96ea4a01afe0ea4090c5c8039690672dd13f2e"
++uuid = "6e34b625-4abd-537c-b88f-471c36dfa7a0"
++version = "1.0.9+0"
++
++[[deps.Combinatorics]]
++git-tree-sha1 = "08c8b6831dc00bfea825826be0bc8336fc369860"
++uuid = "861a8166-3701-5b0c-9a16-15d98fcdc6aa"
++version = "1.0.2"
++
++[[deps.CommonSubexpressions]]
++deps = ["MacroTools"]
++git-tree-sha1 = "cda2cfaebb4be89c9084adaca7dd7333369715c5"
++uuid = "bbf7d656-a473-5ed7-a52c-81e309532950"
++version = "0.3.1"
++
++[[deps.CommonWorldInvalidations]]
++deps = ["PrecompileTools"]
++git-tree-sha1 = "bc209b1a67dd03551fe305d72e88128764b89cf5"
++uuid = "f70d9fcc-98c5-4d4a-abd7-e4cdeebd8ca8"
++version = "1.2.0"
++
++[[deps.Compat]]
++deps = ["TOML", "UUIDs"]
++git-tree-sha1 = "9d8a54ce4b17aa5bdce0ea5c34bc5e7c340d16ad"
++uuid = "34da2185-b29b-5c13-b0c7-acf172513d20"
++version = "4.18.1"
++weakdeps = ["Dates", "LinearAlgebra"]
++
++    [deps.Compat.extensions]
++    CompatLinearAlgebraExt = "LinearAlgebra"
++
++[[deps.CompilerSupportLibraries_jll]]
++deps = ["Artifacts", "Libdl"]
++uuid = "e66e0078-7015-5450-92f7-15fbd957f2ae"
++version = "1.3.1+2"
++
++[[deps.CompositeTypes]]
++git-tree-sha1 = "bce26c3dab336582805503bed209faab1c279768"
++uuid = "b152e2b5-7a66-4b01-a709-34e65c35f657"
++version = "0.1.4"
++
++[[deps.CompositionsBase]]
++git-tree-sha1 = "802bb88cd69dfd1509f6670416bd4434015693ad"
++uuid = "a33af91c-f02d-484b-be07-31d278c5ca2b"
++version = "0.1.2"
++weakdeps = ["InverseFunctions"]
++
++    [deps.CompositionsBase.extensions]
++    CompositionsBaseInverseFunctionsExt = "InverseFunctions"
++
++[[deps.Conda]]
++deps = ["Downloads", "JSON", "VersionParsing"]
++git-tree-sha1 = "8f06b0cfa4c514c7b9546756dbae91fcfbc92dc9"
++uuid = "8f4d0f93-b110-5947-807f-2305c1781a2d"
++version = "1.10.3"
++
++[[deps.ConstructionBase]]
++git-tree-sha1 = "b4b092499347b18a015186eae3042f72267106cb"
++uuid = "187b0558-2788-49d3-abe0-74a17ed4e7c9"
++version = "1.6.0"
++weakdeps = ["IntervalSets", "LinearAlgebra", "StaticArrays"]
++
++    [deps.ConstructionBase.extensions]
++    ConstructionBaseIntervalSetsExt = "IntervalSets"
++    ConstructionBaseLinearAlgebraExt = "LinearAlgebra"
++    ConstructionBaseStaticArraysExt = "StaticArrays"
++
++[[deps.DataStructures]]
++deps = ["OrderedCollections"]
++git-tree-sha1 = "b0bc6d2cad1fed8b7fd59a1551a991cb3d2809e6"
++uuid = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
++version = "0.19.6"
++
++[[deps.Dates]]
++deps = ["Printf"]
++uuid = "ade2ca70-3891-5945-98fb-dc099432e06a"
++version = "1.11.0"
++
++[[deps.DelimitedFiles]]
++deps = ["Mmap"]
++git-tree-sha1 = "9e2f36d3c96a820c678f2f1f1782582fcf685bae"
++uuid = "8bb1440f-4735-579b-a4ab-409b98df4dab"
++version = "1.9.1"
++
++[[deps.DiffResults]]
++deps = ["StaticArraysCore"]
++git-tree-sha1 = "782dd5f4561f5d267313f23853baaaa4c52ea621"
++uuid = "163ba53b-c6d8-5494-b064-1a9d43ac40c5"
++version = "1.1.0"
++
++[[deps.DiffRules]]
++deps = ["IrrationalConstants", "LogExpFunctions", "NaNMath", "Random", "SpecialFunctions"]
++git-tree-sha1 = "79a2aca180a85c690c58a020d47b426954b590f8"
++uuid = "b552c78f-8df3-52c6-915a-8e097449b14b"
++version = "1.16.0"
++
++[[deps.DocStringExtensions]]
++git-tree-sha1 = "7442a5dfe1ebb773c29cc2962a8980f47221d76c"
++uuid = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
++version = "0.9.5"
++
++[[deps.DomainSets]]
++deps = ["CompositeTypes", "FunctionMaps", "IntervalSets", "LinearAlgebra", "StaticArrays"]
++git-tree-sha1 = "c0f576ae49bd2d1bc904b9946f4783db8f0ef530"
++uuid = "5b8099bc-c8ec-5219-889f-1d9e522a28bf"
++version = "0.8.1"
++
++    [deps.DomainSets.extensions]
++    DomainSetsMakieExt = "Makie"
++    DomainSetsRandomExt = "Random"
++
++    [deps.DomainSets.weakdeps]
++    Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
++    Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
++
++[[deps.Downloads]]
++deps = ["ArgTools", "FileWatching", "LibCURL", "NetworkOptions"]
++uuid = "f43a241f-c20a-4ad4-852c-f6b1247861c6"
++version = "1.7.0"
++
++[[deps.DynamicPolynomials]]
++deps = ["LinearAlgebra", "MultivariatePolynomials", "MutableArithmetics", "Reexport", "StarAlgebras"]
++git-tree-sha1 = "b95c4325301d86a6a1b59790b71f7269a8702dd5"
++uuid = "7c1d4256-1411-5781-91ec-d7bc3513ac07"
++version = "0.6.8"
++
++[[deps.Einsum]]
++deps = ["Compat"]
++git-tree-sha1 = "4a6b3eee0161c89700b6c1949feae8b851da5494"
++uuid = "b7d42ee7-0b51-5a75-98ca-779d3107e4c0"
++version = "0.4.1"
++
++[[deps.EnumX]]
++git-tree-sha1 = "c49898e8438c828577f04b92fc9368c388ac783c"
++uuid = "4e289a0a-7415-4d19-859d-a7e5c4648b56"
++version = "1.0.7"
++
++[[deps.Exodus]]
++deps = ["DocStringExtensions", "Exodus_jll"]
++git-tree-sha1 = "503e0bd70cec74a4996fac8e4fca81d11b004c71"
++uuid = "f57ae99e-f805-4780-bdca-96e224be1e5a"
++version = "0.14.4"
++
++    [deps.Exodus.extensions]
++    ExodusMeshesExt = "Meshes"
++    ExodusPartitionedArraysExt = "PartitionedArrays"
++    ExodusUnitfulExt = "Unitful"
++
++    [deps.Exodus.weakdeps]
++    Meshes = "eacbb407-ea5a-433e-ab97-5258b1ca43fa"
++    PartitionedArrays = "5a9dfac6-5c52-46f7-8278-5e2210713be9"
++    Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
++
++[[deps.Exodus_jll]]
++deps = ["Artifacts", "Fmt_jll", "HDF5_jll", "JLLWrappers", "Libdl", "NetCDF_jll", "Zlib_jll"]
++git-tree-sha1 = "464889bcc640b694f0465478e5e5f4944d9731f2"
++uuid = "fc7263ad-bce8-5229-97b1-c6ddabda41b1"
++version = "9.4.0+0"
++
++[[deps.ExprTools]]
++git-tree-sha1 = "d2e49e7efd29719d6f28b891b0e0e159daa9d2b4"
++uuid = "e2ba6199-217a-4e67-a87a-7c52f15ade04"
++version = "0.1.11"
++
++[[deps.ExproniconLite]]
++git-tree-sha1 = "c13f0b150373771b0fdc1713c97860f8df12e6c2"
++uuid = "55351af7-c7e9-48d6-89ff-24e801d99491"
++version = "0.10.14"
++
++[[deps.FileIO]]
++deps = ["Pkg", "Requires", "UUIDs"]
++git-tree-sha1 = "6621fef488e496356c9c9625d0562c12a6070819"
++uuid = "5789e2e9-d7fb-5bc7-8068-2c6fae9b9549"
++version = "1.20.0"
++
++    [deps.FileIO.extensions]
++    HTTPExt = "HTTP"
++
++    [deps.FileIO.weakdeps]
++    HTTP = "cd3eb016-35fb-5094-929b-558a96fad6f3"
++
++[[deps.FileWatching]]
++uuid = "7b1f6079-737a-58dc-b8bc-7a2ca5c1b5ee"
++version = "1.11.0"
++
++[[deps.Fmt_jll]]
++deps = ["Artifacts", "JLLWrappers", "Libdl"]
++git-tree-sha1 = "38ac3c197b18d75111a531bf7faa83519cdfff02"
++uuid = "5dc1e892-f187-50dd-85f3-7dff85c47fc5"
++version = "11.1.1+0"
++
++[[deps.Format]]
++git-tree-sha1 = "9c68794ef81b08086aeb32eeaf33531668d5f5fc"
++uuid = "1fa38f19-a742-5d3f-a2b9-30dd87b9d5f8"
++version = "1.3.7"
++
++[[deps.ForwardDiff]]
++deps = ["CommonSubexpressions", "DiffResults", "DiffRules", "LinearAlgebra", "LogExpFunctions", "NaNMath", "Preferences", "Printf", "Random", "SpecialFunctions"]
++git-tree-sha1 = "1b86cca764a61dcac4fef4c5e16e378e5ed6953c"
++uuid = "f6369f11-7733-5829-9624-2563aa707210"
++version = "1.4.5"
++weakdeps = ["StaticArrays"]
++
++    [deps.ForwardDiff.extensions]
++    ForwardDiffStaticArraysExt = "StaticArrays"
++
++[[deps.FunctionMaps]]
++deps = ["CompositeTypes", "LinearAlgebra", "StaticArrays"]
++git-tree-sha1 = "31bd99a57edf98990d1c21486032963955450e8d"
++uuid = "a85aefff-f8ca-4649-a888-c8e5398bc76c"
++version = "0.1.2"
++
++[[deps.Future]]
++deps = ["Random"]
++uuid = "9fa8497b-333b-5362-9e8d-4d0656e87820"
++version = "1.11.0"
++
++[[deps.Graphs]]
++deps = ["ArnoldiMethod", "DataStructures", "Inflate", "LinearAlgebra", "Random", "SimpleTraits", "SparseArrays", "Statistics"]
++git-tree-sha1 = "7eb45fe833a5b7c51cf6d89c5a841d5967e44be3"
++uuid = "86223c79-3864-5bf0-83f7-82e725a168b6"
++version = "1.14.0"
++
++    [deps.Graphs.extensions]
++    GraphsSharedArraysExt = "SharedArrays"
++
++    [deps.Graphs.weakdeps]
++    Distributed = "8ba89e20-285c-5b6f-9357-94700520ee1b"
++    SharedArrays = "1a1011a3-84de-559e-8e89-a11a2f7dc383"
++
++[[deps.HDF5_jll]]
++deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "LazyArtifacts", "LibCURL_jll", "Libdl", "MPICH_jll", "MPIPreferences", "MPItrampoline_jll", "MicrosoftMPI_jll", "OpenMPI_jll", "OpenSSL_jll", "TOML", "Zlib_jll", "libaec_jll"]
++git-tree-sha1 = "e94f84da9af7ce9c6be049e9067e511e17ff89ec"
++uuid = "0234f1f7-429e-5d53-9886-15a909be8d59"
++version = "1.14.6+0"
++
++[[deps.Hwloc_jll]]
++deps = ["Artifacts", "JLLWrappers", "Libdl", "XML2_jll", "Xorg_libpciaccess_jll"]
++git-tree-sha1 = "c35847ca5b4997fc8418836354a56c459bcf48d8"
++uuid = "e33a78d0-f292-5ffc-b300-72abe9b543c8"
++version = "2.14.0+0"
++
++[[deps.Inflate]]
++git-tree-sha1 = "d1b1b796e47d94588b3757fe84fbf65a5ec4a80d"
++uuid = "d25df0c9-e2be-5dd7-82c8-3ad0b3e990b9"
++version = "0.1.5"
++
++[[deps.IntegerMathUtils]]
++git-tree-sha1 = "c72458f1962faeb003bf23cbdb75164fe6280906"
++uuid = "18e54dd8-cb9d-406c-a71d-865a43cbb235"
++version = "0.1.4"
++
++[[deps.InteractiveUtils]]
++deps = ["Markdown"]
++uuid = "b77e0a4c-d291-57a0-90e8-8db25a27a240"
++version = "1.11.0"
++
++[[deps.IntervalSets]]
++git-tree-sha1 = "79d6bd28c8d9bccc2229784f1bd637689b256377"
++uuid = "8197267c-284f-5f27-9208-e0e47529a953"
++version = "0.7.14"
++weakdeps = ["Random", "RecipesBase", "Statistics"]
++
++    [deps.IntervalSets.extensions]
++    IntervalSetsRandomExt = "Random"
++    IntervalSetsRecipesBaseExt = "RecipesBase"
++    IntervalSetsStatisticsExt = "Statistics"
++
++[[deps.InverseFunctions]]
++git-tree-sha1 = "a779299d77cd080bf77b97535acecd73e1c5e5cb"
++uuid = "3587e190-3f89-42d0-90ee-14403ec27112"
++version = "0.1.17"
++weakdeps = ["Dates", "Test"]
++
++    [deps.InverseFunctions.extensions]
++    InverseFunctionsDatesExt = "Dates"
++    InverseFunctionsTestExt = "Test"
++
++[[deps.IrrationalConstants]]
++git-tree-sha1 = "b2d91fe939cae05960e760110b328288867b5758"
++uuid = "92d709cd-6900-40b7-9082-c6be49f344b6"
++version = "0.2.6"
++
++[[deps.IterativeSolvers]]
++deps = ["LinearAlgebra", "Printf", "Random", "RecipesBase", "SparseArrays"]
++git-tree-sha1 = "59545b0a2b27208b0650df0a46b8e3019f85055b"
++uuid = "42fd0dbc-a981-5370-80f2-aaf504508153"
++version = "0.9.4"
++
++[[deps.JLLWrappers]]
++deps = ["Artifacts", "Preferences"]
++git-tree-sha1 = "7204148362dafe5fe6a273f855b8ccbe4df8173e"
++uuid = "692b3bcd-3c85-4b1f-b108-f13ce0eb3210"
++version = "1.8.0"
++
++[[deps.JSON]]
++deps = ["Dates", "Logging", "Parsers", "PrecompileTools", "StructUtils", "UUIDs", "Unicode"]
++git-tree-sha1 = "c7345ab1a7ca4dc8a02c9f6510da0d9857bbe513"
++uuid = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
++version = "1.7.1"
++
++    [deps.JSON.extensions]
++    JSONArrowExt = ["ArrowTypes"]
++
++    [deps.JSON.weakdeps]
++    ArrowTypes = "31f734f8-188a-4ce0-8406-c8a06bd891cd"
++
++[[deps.Jieko]]
++deps = ["ExproniconLite"]
++git-tree-sha1 = "2f05ed29618da60c06a87e9c033982d4f71d0b6c"
++uuid = "ae98c720-c025-4a4a-838c-29b094483192"
++version = "0.2.1"
++
++[[deps.JuliaSyntaxHighlighting]]
++deps = ["StyledStrings"]
++uuid = "ac6e5ff7-fb65-4e79-a425-ec3bc9c03011"
++version = "1.12.0"
++
++[[deps.LazyArtifacts]]
++deps = ["Artifacts", "Pkg"]
++uuid = "4af54fe1-eca0-43a8-85a7-787d91b784e3"
++version = "1.11.0"
++
++[[deps.LibCURL]]
++deps = ["LibCURL_jll", "MozillaCACerts_jll"]
++uuid = "b27032c2-a3e7-50c8-80cd-2d36dbcbfd21"
++version = "0.6.4"
++
++[[deps.LibCURL_jll]]
++deps = ["Artifacts", "LibSSH2_jll", "Libdl", "OpenSSL_jll", "Zlib_jll", "nghttp2_jll"]
++uuid = "deac9b47-8bc7-5906-a0fe-35ac56dc84c0"
++version = "8.15.0+0"
++
++[[deps.LibGit2]]
++deps = ["LibGit2_jll", "NetworkOptions", "Printf", "SHA"]
++uuid = "76f85450-5226-5b5a-8eaa-529ad045b433"
++version = "1.11.0"
++
++[[deps.LibGit2_jll]]
++deps = ["Artifacts", "LibSSH2_jll", "Libdl", "OpenSSL_jll"]
++uuid = "e37daf67-58a4-590a-8e99-b0245dd2ffc5"
++version = "1.9.0+0"
++
++[[deps.LibSSH2_jll]]
++deps = ["Artifacts", "Libdl", "OpenSSL_jll"]
++uuid = "29816b5a-b9ab-546f-933c-edad1886dfa8"
++version = "1.11.3+1"
++
++[[deps.Libdl]]
++uuid = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
++version = "1.11.0"
++
++[[deps.Libiconv_jll]]
++deps = ["Artifacts", "JLLWrappers", "Libdl"]
++git-tree-sha1 = "be484f5c92fad0bd8acfef35fe017900b0b73809"
++uuid = "94ce4f54-9a6c-5748-9c1c-f9c7231a4531"
++version = "1.18.0+0"
++
++[[deps.LinearAlgebra]]
++deps = ["Libdl", "OpenBLAS_jll", "libblastrampoline_jll"]
++uuid = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
++version = "1.12.0"
++
++[[deps.LogExpFunctions]]
++deps = ["DocStringExtensions", "IrrationalConstants", "LinearAlgebra"]
++git-tree-sha1 = "bba2d9aa057d8f126415de240573e86a8f39d2a1"
++uuid = "2ab3a3ac-af41-5b50-aa03-7779005ae688"
++version = "1.0.1"
++
++    [deps.LogExpFunctions.extensions]
++    LogExpFunctionsChainRulesCoreExt = "ChainRulesCore"
++    LogExpFunctionsChangesOfVariablesExt = "ChangesOfVariables"
++    LogExpFunctionsInverseFunctionsExt = "InverseFunctions"
++
++    [deps.LogExpFunctions.weakdeps]
++    ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
++    ChangesOfVariables = "9e997f8a-9a97-42d5-a9f1-ce6bfc15e2c0"
++    InverseFunctions = "3587e190-3f89-42d0-90ee-14403ec27112"
++
++[[deps.Logging]]
++uuid = "56ddb016-857b-54e1-b83d-db4d58db5568"
++version = "1.11.0"
++
++[[deps.Lz4_jll]]
++deps = ["Artifacts", "JLLWrappers", "Libdl"]
++git-tree-sha1 = "191686b1ac1ea9c89fc52e996ad15d1d241d1e33"
++uuid = "5ced341a-0733-55b8-9ab6-a4889d929147"
++version = "1.10.1+0"
++
++[[deps.MPICH_jll]]
++deps = ["Artifacts", "CompilerSupportLibraries_jll", "Hwloc_jll", "JLLWrappers", "LazyArtifacts", "Libdl", "MPIPreferences", "TOML"]
++git-tree-sha1 = "9341048b9f723f2ae2a72a5269ac2f15f80534dc"
++uuid = "7cb0a576-ebde-5e09-9194-50597f1243b4"
++version = "4.3.2+0"
++
++[[deps.MPIPreferences]]
++deps = ["Libdl", "Preferences"]
++git-tree-sha1 = "8e98d5d80b87403c311fd51e8455d4546ba7a5f8"
++uuid = "3da0fdf6-3ccc-4f1b-acd9-58baa6c99267"
++version = "0.1.12"
++
++[[deps.MPItrampoline_jll]]
++deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "LazyArtifacts", "Libdl", "MPIPreferences", "TOML"]
++git-tree-sha1 = "675df097f8eeb28998b2cfe3b25655af73d5f7df"
++uuid = "f1f71cc9-e9ae-5b93-9b94-4fe0e1ad3748"
++version = "5.5.6+0"
++
++[[deps.MacroTools]]
++git-tree-sha1 = "1e0228a030642014fe5cfe68c2c0a818f9e3f522"
++uuid = "1914dd2f-81c6-5fcd-8719-6d5c9610ff09"
++version = "0.5.16"
++
++[[deps.Markdown]]
++deps = ["Base64", "JuliaSyntaxHighlighting", "StyledStrings"]
++uuid = "d6f4376e-aef5-505a-96c1-9c027394607a"
++version = "1.11.0"
++
++[[deps.MicrosoftMPI_jll]]
++deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
++git-tree-sha1 = "bc95bf4149bf535c09602e3acdf950d9b4376227"
++uuid = "9237b28f-5490-5468-be7b-bb81f5f5e6cf"
++version = "10.1.4+3"
++
++[[deps.Mmap]]
++uuid = "a63ad114-7e13-5084-954f-fe012c677804"
++version = "1.11.0"
++
++[[deps.Moshi]]
++deps = ["ExproniconLite", "Jieko"]
++git-tree-sha1 = "60beb0717782a3bbe0f7df56decad0ef89048c23"
++uuid = "2e0e35c7-a2e4-4343-998d-7ef72827ed2d"
++version = "0.3.12"
++
++[[deps.MozillaCACerts_jll]]
++uuid = "14a3606d-f60d-562e-9121-12d972cd8159"
++version = "2025.11.4"
++
++[[deps.MultivariatePolynomials]]
++deps = ["DataStructures", "LinearAlgebra", "MutableArithmetics", "StarAlgebras"]
++git-tree-sha1 = "4838893d9b035c2f6967c0d533350e1755b58a70"
++uuid = "102ac46a-7ee4-5c85-9060-abc95bfdeaa3"
++version = "0.5.19"
++
++    [deps.MultivariatePolynomials.extensions]
++    MultivariatePolynomialsChainRulesCoreExt = "ChainRulesCore"
++
++    [deps.MultivariatePolynomials.weakdeps]
++    ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
++
++[[deps.MutableArithmetics]]
++deps = ["LinearAlgebra", "SparseArrays", "Test"]
++git-tree-sha1 = "dc5b2c4c111c46bc79ac4405eeb563523b39c004"
++uuid = "d8a4904e-b15c-11e9-3269-09a3773c0cb0"
++version = "1.8.0"
++
++[[deps.NPZ]]
++deps = ["FileIO", "ZipFile"]
++git-tree-sha1 = "60a8e272fe0c5079363b28b0953831e2dd7b7e6f"
++uuid = "15e1cf62-19b3-5cfa-8e77-841668bca605"
++version = "0.4.3"
++
++[[deps.NaNMath]]
++deps = ["OpenLibm_jll"]
++git-tree-sha1 = "dbd2e8cd2c1c27f0b584f6661b4309609c5a685e"
++uuid = "77ba4419-2d1f-58cd-9bb1-8ffee604a2e3"
++version = "1.1.4"
++
++[[deps.NetCDF_jll]]
++deps = ["Artifacts", "Blosc_jll", "Bzip2_jll", "HDF5_jll", "JLLWrappers", "LazyArtifacts", "LibCURL_jll", "Libdl", "MPICH_jll", "MPIPreferences", "MPItrampoline_jll", "MicrosoftMPI_jll", "OpenMPI_jll", "TOML", "XML2_jll", "Zlib_jll", "Zstd_jll", "libaec_jll", "libzip_jll"]
++git-tree-sha1 = "d574803b6055116af212434460adf654ce98e345"
++uuid = "7243133f-43d8-5620-bbf4-c2c921802cf3"
++version = "401.900.300+0"
++
++[[deps.NetworkOptions]]
++uuid = "ca575930-c2e3-43a9-ace4-1e988b2c1908"
++version = "1.3.0"
++
++[[deps.Norma]]
++deps = ["DelimitedFiles", "Einsum", "Exodus", "Format", "ForwardDiff", "IterativeSolvers", "LinearAlgebra", "Logging", "NPZ", "Printf", "PyCall", "Random", "SparseArrays", "StaticArrays", "Statistics", "Symbolics", "Test", "YAML"]
++path = "."
++uuid = "b933802f-98f0-4369-86cc-558227202cec"
++version = "0.1.0"
++
++    [deps.Norma.extensions]
++    NormaPyTorchExt = "PyCall"
++
++[[deps.OpenBLAS_jll]]
++deps = ["Artifacts", "CompilerSupportLibraries_jll", "Libdl"]
++uuid = "4536629a-c528-5b80-bd46-f80d51c5b363"
++version = "0.3.29+0"
++
++[[deps.OpenLibm_jll]]
++deps = ["Artifacts", "Libdl"]
++uuid = "05823500-19ac-5b8b-9628-191a04bc5112"
++version = "0.8.7+0"
++
++[[deps.OpenMPI_jll]]
++deps = ["Artifacts", "CompilerSupportLibraries_jll", "Hwloc_jll", "JLLWrappers", "LazyArtifacts", "Libdl", "MPIPreferences", "TOML", "Zlib_jll"]
++git-tree-sha1 = "6d6c0ca4824268c1a7dca1f4721c535ac63d9074"
++uuid = "fe0851c0-eecd-5654-98d4-656369965a5c"
++version = "5.0.11+0"
++
++[[deps.OpenSSL_jll]]
++deps = ["Artifacts", "Libdl"]
++uuid = "458c3c95-2e84-50aa-8efc-19380b2a3a95"
++version = "3.5.6+0"
++
++[[deps.OpenSpecFun_jll]]
++deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "Libdl"]
++git-tree-sha1 = "1346c9208249809840c91b26703912dff463d335"
++uuid = "efe28fd5-8261-553b-a9e1-b2916fc3738e"
++version = "0.5.6+0"
++
++[[deps.OrderedCollections]]
++git-tree-sha1 = "05f45c2e0de6259db764adbfd2f1dc6d3f8de13c"
++uuid = "bac558e1-5e72-5ebc-8fee-abe8a469f55d"
++version = "2.0.1"
++
++[[deps.Parsers]]
++deps = ["Dates", "PrecompileTools", "UUIDs"]
++git-tree-sha1 = "3de8f5e6e90ebfa8d6d1f86997d6cdcd6a912ff3"
++uuid = "69de0a69-1ddd-5017-9359-2bf0b02dc9f0"
++version = "2.8.7"
++
++[[deps.Pkg]]
++deps = ["Artifacts", "Dates", "Downloads", "FileWatching", "LibGit2", "Libdl", "Logging", "Markdown", "Printf", "Random", "SHA", "TOML", "Tar", "UUIDs", "p7zip_jll"]
++uuid = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
++version = "1.12.1"
++
++    [deps.Pkg.extensions]
++    REPLExt = "REPL"
++
++    [deps.Pkg.weakdeps]
++    REPL = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
++
++[[deps.PrecompileTools]]
++deps = ["Preferences"]
++git-tree-sha1 = "edbeefc7a4889f528644251bdb5fc9ab5348bc2c"
++uuid = "aea7be01-6a6a-4083-8856-8a6e6704d82a"
++version = "1.3.4"
++
++[[deps.Preferences]]
++deps = ["TOML"]
++git-tree-sha1 = "8b770b60760d4451834fe79dd483e318eee709c4"
++uuid = "21216c6a-2e73-6563-6e65-726566657250"
++version = "1.5.2"
++
++[[deps.Primes]]
++deps = ["IntegerMathUtils"]
++git-tree-sha1 = "25cdd1d20cd005b52fc12cb6be3f75faaf59bb9b"
++uuid = "27ebfcd6-29c5-5fa9-bf4b-fb8fc14df3ae"
++version = "0.5.7"
++
++[[deps.Printf]]
++deps = ["Unicode"]
++uuid = "de0858da-6303-5e67-8744-51eddeeeb8d7"
++version = "1.11.0"
++
++[[deps.PyCall]]
++deps = ["Conda", "Dates", "Libdl", "LinearAlgebra", "MacroTools", "Serialization", "VersionParsing"]
++git-tree-sha1 = "9816a3826b0ebf49ab4926e2b18842ad8b5c8f04"
++uuid = "438e738f-606a-5dbb-bf0a-cddfbfd45ab0"
++version = "1.96.4"
++
++[[deps.Random]]
++deps = ["SHA"]
++uuid = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
++version = "1.11.0"
++
++[[deps.ReadOnlyArrays]]
++git-tree-sha1 = "e6f7ddf48cf141cb312b078ca21cb2d29d0dc11d"
++uuid = "988b38a3-91fc-5605-94a2-ee2116b3bd83"
++version = "0.2.0"
++
++[[deps.RecipesBase]]
++deps = ["PrecompileTools"]
++git-tree-sha1 = "5c3d09cc4f31f5fc6af001c250bf1278733100ff"
++uuid = "3cdcf5f2-1ef4-517c-9805-6587b60abb01"
++version = "1.3.4"
++
++[[deps.Reexport]]
++git-tree-sha1 = "45e428421666073eab6f2da5c9d310d99bb12f9b"
++uuid = "189a3867-3050-52da-a836-e630ba90ab69"
++version = "1.2.2"
++
++[[deps.Requires]]
++deps = ["UUIDs"]
++git-tree-sha1 = "62389eeff14780bfe55195b7204c0d8738436d64"
++uuid = "ae029012-a4dd-5104-9daa-d747884805df"
++version = "1.3.1"
++
++[[deps.RuntimeGeneratedFunctions]]
++deps = ["ExprTools", "PrecompileTools", "SHA", "Serialization"]
++git-tree-sha1 = "6cb9b83354089fcb33c643773acfd3235f2f1bf5"
++uuid = "7e49a35a-f44a-4d26-94aa-eba1b4ca6b47"
++version = "0.5.25"
++
++[[deps.SHA]]
++uuid = "ea8e919c-243c-51af-8825-aaa63cd721ce"
++version = "0.7.0"
++
++[[deps.SciMLPublic]]
++deps = ["PrecompileTools"]
++git-tree-sha1 = "74685afb51732a464fbce79a72708f7c4203ceb7"
++uuid = "431bcebd-1456-4ced-9d72-93c2757fff0b"
++version = "1.3.0"
++
++[[deps.Serialization]]
++uuid = "9e88b42a-f829-5b0c-bbe9-9e923198166b"
++version = "1.11.0"
++
++[[deps.Setfield]]
++deps = ["ConstructionBase", "Future", "MacroTools", "StaticArraysCore"]
++git-tree-sha1 = "c5391c6ace3bc430ca630251d02ea9687169ca68"
++uuid = "efcf1570-3423-57d1-acb7-fd33fddbac46"
++version = "1.1.2"
++
++[[deps.SimpleTraits]]
++deps = ["InteractiveUtils", "MacroTools"]
++git-tree-sha1 = "7ddb0b49c109481b046972c0e4ab02b2127d6a75"
++uuid = "699a6c99-e7fa-54fc-8d76-47d257e15c1d"
++version = "0.9.6"
++
++[[deps.SparseArrays]]
++deps = ["Libdl", "LinearAlgebra", "Random", "Serialization", "SuiteSparse_jll"]
++uuid = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
++version = "1.12.0"
++
++[[deps.SpecialFunctions]]
++deps = ["IrrationalConstants", "LogExpFunctions", "OpenLibm_jll", "OpenSpecFun_jll"]
++git-tree-sha1 = "429071b23f4c9a13fb6582f807cc2ef454082408"
++uuid = "276daf66-3868-5448-9aa4-cd146d93841b"
++version = "2.9.0"
++
++    [deps.SpecialFunctions.extensions]
++    SpecialFunctionsChainRulesCoreExt = "ChainRulesCore"
++
++    [deps.SpecialFunctions.weakdeps]
++    ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
++
++[[deps.StarAlgebras]]
++deps = ["LinearAlgebra", "MutableArithmetics", "SparseArrays"]
++git-tree-sha1 = "235b1f9d287bbf34083b3d0829343a7942c0ad1c"
++uuid = "0c0c59c1-dc5f-42e9-9a8b-b5dc384a6cd1"
++version = "0.3.0"
++
++[[deps.StaticArrays]]
++deps = ["LinearAlgebra", "PrecompileTools", "Random", "StaticArraysCore"]
++git-tree-sha1 = "fac51faf3bb96e8bc0bf6f9f39ca4955652776bb"
++uuid = "90137ffa-7385-5640-81b9-e52037218182"
++version = "1.9.19"
++
++    [deps.StaticArrays.extensions]
++    StaticArraysChainRulesCoreExt = "ChainRulesCore"
++    StaticArraysStatisticsExt = "Statistics"
++
++    [deps.StaticArrays.weakdeps]
++    ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
++    Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
++
++[[deps.StaticArraysCore]]
++git-tree-sha1 = "6ab403037779dae8c514bad259f32a447262455a"
++uuid = "1e83bf80-4336-4d27-bf5d-d5a4f845583c"
++version = "1.4.4"
++
++[[deps.Statistics]]
++deps = ["LinearAlgebra"]
++git-tree-sha1 = "389592b8592e5fb48f498ff60dc6acb4a0e62953"
++uuid = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
++version = "1.11.4"
++weakdeps = ["SparseArrays"]
++
++    [deps.Statistics.extensions]
++    SparseArraysExt = ["SparseArrays"]
++
++[[deps.StringEncodings]]
++deps = ["Libiconv_jll"]
++git-tree-sha1 = "b765e46ba27ecf6b44faf70df40c57aa3a547dcb"
++uuid = "69024149-9ee7-55f6-a4c4-859efe599b68"
++version = "0.3.7"
++
++[[deps.StructUtils]]
++deps = ["Dates", "UUIDs"]
++git-tree-sha1 = "2d0fc55c61321ba245c47be599570d11bac50303"
++uuid = "ec057cc2-7a8d-4b58-b3b3-92acb9f63b42"
++version = "2.8.5"
++
++    [deps.StructUtils.extensions]
++    StructUtilsMeasurementsExt = ["Measurements"]
++    StructUtilsStaticArraysCoreExt = ["StaticArraysCore"]
++    StructUtilsTablesExt = ["Tables"]
++
++    [deps.StructUtils.weakdeps]
++    Measurements = "eff96d63-e80a-5855-80a2-b1b0885c5ab7"
++    StaticArraysCore = "1e83bf80-4336-4d27-bf5d-d5a4f845583c"
++    Tables = "bd369af6-aec1-5ad0-b16a-f7cc5008161c"
++
++[[deps.StyledStrings]]
++uuid = "f489334b-da3d-4c2e-b8f0-e476e12c162b"
++version = "1.11.0"
++
++[[deps.SuiteSparse_jll]]
++deps = ["Artifacts", "Libdl", "libblastrampoline_jll"]
++uuid = "bea87d4a-7f5b-5778-9afe-8cc45184846c"
++version = "7.8.3+2"
++
++[[deps.SymbolicIndexingInterface]]
++deps = ["Accessors", "ArrayInterface", "PrecompileTools", "RuntimeGeneratedFunctions", "StaticArraysCore"]
++git-tree-sha1 = "7eb6da9656581ac9fbffaef3ef7950a090a5002a"
++uuid = "2efcf032-c050-4f8e-a9bb-153293bab1f5"
++version = "0.3.55"
++
++    [deps.SymbolicIndexingInterface.extensions]
++    SymbolicIndexingInterfacePrettyTablesExt = "PrettyTables"
++
++    [deps.SymbolicIndexingInterface.weakdeps]
++    PrettyTables = "08abe8d2-0d0c-5749-adfa-8a2ac140af0d"
++
++[[deps.SymbolicLimits]]
++deps = ["PrecompileTools", "SymbolicUtils", "TermInterface"]
++git-tree-sha1 = "3780b4d8aaa1db8996a67146ac7d4ac20606f56e"
++uuid = "19f23fe9-fdab-4a78-91af-e7b7767979c3"
++version = "1.2.1"
++
++[[deps.SymbolicUtils]]
++deps = ["AbstractTrees", "ArrayInterface", "Combinatorics", "ConstructionBase", "DataStructures", "DocStringExtensions", "DynamicPolynomials", "EnumX", "ExproniconLite", "Graphs", "LinearAlgebra", "MacroTools", "Moshi", "MultivariatePolynomials", "MutableArithmetics", "NaNMath", "OrderedCollections", "PrecompileTools", "ReadOnlyArrays", "SciMLPublic", "Setfield", "SparseArrays", "SpecialFunctions", "StaticArraysCore", "SymbolicIndexingInterface", "TaskLocalValues", "TermInterface", "WeakCacheSets"]
++git-tree-sha1 = "05d5d03168999c8c73dce26c4957b8cd4f3bda65"
++uuid = "d1185830-fcd6-423d-90d6-eec64667417b"
++version = "4.46.1"
++
++    [deps.SymbolicUtils.extensions]
++    SymbolicUtilsChainRulesCoreExt = "ChainRulesCore"
++    SymbolicUtilsDistributionsExt = "Distributions"
++    SymbolicUtilsLabelledArraysExt = "LabelledArrays"
++    SymbolicUtilsReverseDiffExt = "ReverseDiff"
++
++    [deps.SymbolicUtils.weakdeps]
++    ChainRulesCore = "d360d2e6-b24c-11e9-a2a3-2a2ae2dbcce4"
++    Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
++    LabelledArrays = "2ee39098-c373-598a-b85f-a56591580800"
++    ReverseDiff = "37e2e3b7-166d-5795-8a7a-e32c996b4267"
++
++[[deps.Symbolics]]
++deps = ["ADTypes", "AbstractPlutoDingetjes", "ArrayInterface", "Bijections", "CommonWorldInvalidations", "ConstructionBase", "DataStructures", "DiffRules", "DocStringExtensions", "DomainSets", "DynamicPolynomials", "IntervalSets", "Libdl", "LinearAlgebra", "LogExpFunctions", "MacroTools", "Markdown", "Moshi", "MultivariatePolynomials", "MutableArithmetics", "NaNMath", "PrecompileTools", "Preferences", "Primes", "RecipesBase", "RuntimeGeneratedFunctions", "SciMLPublic", "Setfield", "SparseArrays", "SpecialFunctions", "StaticArraysCore", "SymbolicIndexingInterface", "SymbolicLimits", "SymbolicUtils", "TermInterface"]
++git-tree-sha1 = "0eea73fa3bb1b579e25211cf4e1aefeeb78097c1"
++uuid = "0c5d862f-8b57-4792-8d23-62f2024744c7"
++version = "7.39.0"
++
++    [deps.Symbolics.extensions]
++    SymbolicsD3TreesExt = "D3Trees"
++    SymbolicsDistributionsExt = "Distributions"
++    SymbolicsForwardDiffExt = "ForwardDiff"
++    SymbolicsGroebnerExt = "Groebner"
++    SymbolicsHypergeometricFunctionsExt = "HypergeometricFunctions"
++    SymbolicsLatexifyExt = ["Latexify", "LaTeXStrings"]
++    SymbolicsNemoExt = "Nemo"
++    SymbolicsStaticArraysExt = "StaticArrays"
++    SymbolicsSymPyExt = "SymPy"
++    SymbolicsSymPyPythonCallExt = "SymPyPythonCall"
++
++    [deps.Symbolics.weakdeps]
++    D3Trees = "e3df1716-f71e-5df9-9e2d-98e193103c45"
++    Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
++    ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
++    Groebner = "0b43b601-686d-58a3-8a1c-6623616c7cd4"
++    HypergeometricFunctions = "34004b35-14d8-5ef3-9330-4cdb6864b03a"
++    LaTeXStrings = "b964fa9f-0449-5b57-a5c2-d3ea65f4040f"
++    Latexify = "23fbe1c1-3f47-55db-b15f-69d7ec21a316"
++    Nemo = "2edaba10-b0f1-5616-af89-8c11ac63239a"
++    StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
++    SymPy = "24249f21-da20-56a4-8eb1-6a02cf4ae2e6"
++    SymPyPythonCall = "bc8888f7-b21e-4b7c-a06a-5d9c9496438c"
++
++[[deps.TOML]]
++deps = ["Dates"]
++uuid = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
++version = "1.0.3"
++
++[[deps.Tar]]
++deps = ["ArgTools", "SHA"]
++uuid = "a4e569a6-e804-4fa4-b0f3-eef7a1d5b13e"
++version = "1.10.0"
++
++[[deps.TaskLocalValues]]
++git-tree-sha1 = "67e469338d9ce74fc578f7db1736a74d93a49eb8"
++uuid = "ed4db957-447d-4319-bfb6-7fa9ae7ecf34"
++version = "0.1.3"
++
++[[deps.TermInterface]]
++git-tree-sha1 = "d673e0aca9e46a2f63720201f55cc7b3e7169b16"
++uuid = "8ea1fca8-c5ef-4a55-8b96-4e9afe9c9a3c"
++version = "2.0.0"
++
++[[deps.Test]]
++deps = ["InteractiveUtils", "Logging", "Random", "Serialization"]
++uuid = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
++version = "1.11.0"
++
++[[deps.UUIDs]]
++deps = ["Random", "SHA"]
++uuid = "cf7118a7-6976-5b1a-9a39-7adc72f591a4"
++version = "1.11.0"
++
++[[deps.Unicode]]
++uuid = "4ec0a83e-493e-50e2-b9ac-8f72acf5a8f5"
++version = "1.11.0"
++
++[[deps.VersionParsing]]
++git-tree-sha1 = "58d6e80b4ee071f5efd07fda82cb9fbe17200868"
++uuid = "81def892-9a0e-5fdd-b105-ffc91e053289"
++version = "1.3.0"
++
++[[deps.WeakCacheSets]]
++git-tree-sha1 = "386050ae4353310d8ff9c228f83b1affca2f7f38"
++uuid = "d30d5f5c-d141-4870-aa07-aabb0f5fe7d5"
++version = "0.1.0"
++
++[[deps.XML2_jll]]
++deps = ["Artifacts", "JLLWrappers", "Libdl", "Libiconv_jll", "Zlib_jll"]
++git-tree-sha1 = "80d3930c6347cfce7ccf96bd3bafdf079d9c0390"
++uuid = "02c8fc9c-b97f-50b9-bbe4-9be30ff0a78a"
++version = "2.13.9+0"
++
++[[deps.XZ_jll]]
++deps = ["Artifacts", "JLLWrappers", "Libdl"]
++git-tree-sha1 = "b29c22e245d092b8b4e8d3c09ad7baa586d9f573"
++uuid = "ffd25f8a-64ca-5728-b0f7-c24cf3aae800"
++version = "5.8.3+0"
++
++[[deps.Xorg_libpciaccess_jll]]
++deps = ["Artifacts", "JLLWrappers", "Libdl", "Zlib_jll"]
++git-tree-sha1 = "58972370b81423fc546c56a60ed1a009450177c3"
++uuid = "a65dc6b1-eb27-53a1-bb3e-dea574b5389e"
++version = "0.19.0+0"
++
++[[deps.YAML]]
++deps = ["Base64", "Dates", "Printf", "StringEncodings"]
++git-tree-sha1 = "a1c0c7585346251353cddede21f180b96388c403"
++uuid = "ddb6d928-2868-570f-bddf-ab3f9cf99eb6"
++version = "0.4.16"
++
++[[deps.ZipFile]]
++deps = ["Libdl", "Printf", "Zlib_jll"]
++git-tree-sha1 = "f492b7fe1698e623024e873244f10d89c95c340a"
++uuid = "a5390f91-8eb1-5f08-bee0-b1d1ffed6cea"
++version = "0.10.1"
++
++[[deps.Zlib_jll]]
++deps = ["Libdl"]
++uuid = "83775a58-1f1d-513f-b197-d71354ab007a"
++version = "1.3.1+2"
++
++[[deps.Zstd_jll]]
++deps = ["Artifacts", "JLLWrappers", "Libdl"]
++git-tree-sha1 = "446b23e73536f84e8037f5dce465e92275f6a308"
++uuid = "3161d3a3-bdf6-5164-811a-617609db77b4"
++version = "1.5.7+1"
++
++[[deps.libaec_jll]]
++deps = ["Artifacts", "JLLWrappers", "Libdl"]
++git-tree-sha1 = "60f4792734488db6f42e2c7699f1d4594780bd03"
++uuid = "477f73a3-ac25-53e9-8cc3-50b2fa2566f0"
++version = "1.1.7+0"
++
++[[deps.libblastrampoline_jll]]
++deps = ["Artifacts", "Libdl"]
++uuid = "8e850b90-86db-534c-a0d3-1478176c7d93"
++version = "5.15.0+0"
++
++[[deps.libzip_jll]]
++deps = ["Artifacts", "Bzip2_jll", "JLLWrappers", "Libdl", "OpenSSL_jll", "XZ_jll", "Zlib_jll", "Zstd_jll"]
++git-tree-sha1 = "86addc139bca85fdf9e7741e10977c45785727b7"
++uuid = "337d8026-41b4-5cde-a456-74a10e5b31d1"
++version = "1.11.3+0"
++
++[[deps.nghttp2_jll]]
++deps = ["Artifacts", "Libdl"]
++uuid = "8e850ede-7688-5339-a07c-302acd2aaf8d"
++version = "1.64.0+1"
++
++[[deps.p7zip_jll]]
++deps = ["Artifacts", "CompilerSupportLibraries_jll", "Libdl"]
++uuid = "3f19e933-33d8-53b3-aaab-bd5110c3b7a0"
++version = "17.7.0+0"
+diff --git a/test/opinf-mass-projection.jl b/test/opinf-mass-projection.jl
+new file mode 100644
+index 00000000..9bf3ae78
+--- /dev/null
++++ b/test/opinf-mass-projection.jl
+@@ -0,0 +1,65 @@
++# Norma: Copyright 2025 National Technology & Engineering Solutions of
++# Sandia, LLC (NTESS). Under the terms of Contract DE-NA0003525 with NTESS,
++# the U.S. Government retains certain rights in this software. This software
++# is released under the BSD license detailed in the file license.txt in the
++# top-level Norma.jl directory.
++
++using SparseArrays
++
++@testset "M-orthonormal OpInf projection" begin
++    # Two nodes with component-fast ordering:
++    # [x1, y1, z1, x2, y2, z2].
++    free = BitVector([true, false, true, true, true, false])
++    A = [
++        2.0  0.4  0.1  0.3  0.0  0.2
++        0.1  1.8  0.2  0.0  0.5  0.1
++        0.3  0.2  1.7  0.4  0.1  0.0
++        0.0  0.3  0.2  1.9  0.4  0.2
++        0.2  0.0  0.1  0.3  1.6  0.5
++        0.1  0.4  0.0  0.2  0.3  1.5
++    ]
++    mass = sparse(A' * A + 0.5I)
++
++    phi = [1.0, 0.0, -0.5, 0.75, 0.25, 0.0]
++    phi ./= sqrt(dot(phi[free], mass[free, free] * phi[free]))
++    basis = reshape(phi, 3, 2, 1)
++
++    projector = Norma.build_mass_basis_projector(basis, mass, free)
++    @test projector * phi ≈ [1.0]
++    @test all(iszero, projector[:, .!free])
++
++    coordinate = 2.75
++    state = coordinate .* phi
++    state[.!free] .= [10.0, -4.0]
++    @test projector * state ≈ [coordinate]
++
++    # A full-M projection would include prescribed values through M_fc even
++    # though the basis itself is zero on constrained rows.
++    full_projection = dot(phi, mass * state)
++    @test !isapprox(full_projection, coordinate; atol=1.0e-8)
++
++    previous_test_mode = Norma.NORMA_TEST_MODE[]
++    Norma.NORMA_TEST_MODE[] = true
++    try
++        @test_throws Norma.NormaAbortException Norma.build_mass_basis_projector(2.0 .* basis, mass, free)
++        @test_throws Norma.NormaAbortException Norma.basis_inner_product_from_params(
++            Norma.Parameters("model" => Norma.Parameters("basis inner product" => "weighted"))
++        )
++    finally
++        Norma.NORMA_TEST_MODE[] = previous_test_mode
++    end
++
++    @test Norma.basis_inner_product_from_params(
++        Norma.Parameters("model" => Norma.Parameters())
++    ) == :euclidean
++    @test Norma.basis_inner_product_from_params(
++        Norma.Parameters("model" => Norma.Parameters("basis inner product" => "mass"))
++    ) == :mass
++
++    params = Norma.Parameters(
++        "type" => "single",
++        "model" => Norma.Parameters("basis inner product" => "mass"),
++    )
++    @test isempty(Norma.validate_input_parameters(params, "test.yaml"))
++end
++

@@ -1,0 +1,21 @@
+# Versions used for the NN-OpInf paper experiments on 2026-09-08.
+PyYAML==6.0.3
+h5py==3.16.0
+joblib==1.5.3
+matplotlib==3.11.1
+mpi4py==4.1.2
+numpy==2.5.2
+opinf==0.6.0
+pytest==7.4.4
+pytest-mpi==0.6
+pytest-timeout==2.4.0
+scikit-learn==1.9.0
+scipy==1.18.0
+torch==2.13.0
+tqdm==4.70.0
+
+# Base revisions for Python support packages used by torsion. For exact
+# reproduction, apply patches/norma-opinf-cfc80bc9-local.patch and reinstall
+# that checkout as described in README.md.
+romtools @ git+https://github.com/Pressio/rom-tools-and-workflows.git@1c93a49efebcdc73acf8009c3eeed89b237d81e9
+normaopinf @ git+https://github.com/sandialabs/norma-opinf.git@cfc80bc9ccfa76bf4eaba939d1b300a682d63af3

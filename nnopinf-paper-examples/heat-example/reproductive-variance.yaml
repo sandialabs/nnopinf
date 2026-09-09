@@ -1,0 +1,37 @@
+output-directory: 'reproductive-variance/'
+
+training-parameter-set-cardinality: 1
+testing-parameter-set-cardinality: 1
+parameter-training-file: 'params_reproductive_variance.dat'
+parameter-testing-file: 'params_reproductive_variance_testing.dat'
+sample-corners: true
+integration: cn
+
+fom:
+  L: 1.
+  nx: 128
+  end-time: 2.
+  dt: 1.e-2
+  snapshot-collect-frequency: 1
+  fom-output-directory: fom/
+  integration: crank-nicolson
+
+machine-learning:
+  initial-seed: 0
+  num-ensembles: 5
+  ensemble-sizes: [1, 2, 5]
+  reduced-basis-dimensions: [2, 4, 8, 12, 16]
+  training-stop-times: [2.0]
+  skip: 1
+  optimizer: 'ADAM'
+  parameterized: false
+  LBFGS-acceleration: true
+  model-types: ['NNOPINF-NN', 'NNOPINF-SPD-f']
+  num-hidden-layers: 3
+  num-epochs: 10000
+  batch-size: 50
+  learning-rate: 5.e-3
+  weight-decay: 1.e-6
+  lr-decay: 0.9998
+  print-training-output: true
+  training-output-directory: ml-models/

@@ -1,0 +1,50 @@
+output-directory: 'reproductive-op-inf-ep/'
+
+training-parameter-set-cardinality: 1
+testing-parameter-set-cardinality: 1
+parameter-training-file: 'params_reproductive_opinf.dat' 
+parameter-testing-file:  'params_reproductive_opinf.dat'
+sample-corners: false
+
+fom:
+  L: 1.
+  nx: 100
+  ny: 100
+  end-time: 2.5
+  dt: 0.002
+  snapshot-collect-frequency: 1
+  fom-output-directory: fom/
+  integration: rk4
+
+machine-learning:
+  reduced-basis-dimensions: [10,15,20]
+  optimizer: 'ADAM'
+  skip: 1
+  LBFGS-acceleration: true
+  training-stop-times: [2.5]
+  parameterized: false 
+  model-types: ['OpInf-EP-cAH']
+  #  model-types: ['OpInf-cA','OpInf-cAH','OpInf-EP-cAH','NNOPINF-PD-f','NNOPINF-NN','ROM']
+  num-samples: 2
+  num-hidden-layers: 3
+  num-epochs: 10000
+  batch-size: 50
+  learning-rate: 5.e-3
+  weight-decay: 1.e-6
+  lr-decay: 0.9998
+  print-training-output: true
+  training-output-directory: ml-models/
+
+roms:
+  reduced-basis-dimensions: [10,15,20]
+  training-stop-times: [2.5]
+  model-types: ['OpInf-EP-cAH']
+  rom-output-directory: roms/
+
+
+plots:
+  training-stop-times: [2.5]
+  reduced-basis-dimensions: [10,15,20]
+  model-types: ['OpInf-EP-cAH']
+
+

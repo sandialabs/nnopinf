@@ -1,0 +1,14 @@
+CSV output interval: 1.e-5
+CSV write sidesets: true
+Exodus output interval: 5.e-5
+mass matrix file: "mass.npz"
+input mesh file: ../../../input/torsion.g
+model:
+  material: {blocks: {torsion: hyperelastic}, hyperelastic: {Poisson's ratio: 0.25, density: 1000.0, elastic modulus: 1000000000.0, model: neohookean}}
+  type: quadratic opinf rom
+  model-file: ../../../training/quadratic-opinf-operator-4.npz
+  basis inner product: mass
+output mesh file: torsion-quadratic.e
+solver: {absolute tolerance: 1.0e-06, maximum iterations: 128, minimum iterations: 1, relative tolerance: 1.0e-10, step: full Newton, type: Hessian minimizer}
+time integrator: {final time: 5.0e-3, initial time: 0.0, time step: 1.0e-05, type: Newmark, "\u03B2": 0.25, "\u03B3": 0.5}
+type: single
